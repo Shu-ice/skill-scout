@@ -9,7 +9,11 @@
       "Bash(npm run build:*)",
       "Bash(npm run:*)",
       "Bash(grep:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_install",
+      "Bash(ls:*)",
+      "Bash(curl:*)"
     ],
     "deny": []
   }
