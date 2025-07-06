@@ -318,9 +318,27 @@ export default function NBackGame() {
       return;
     }
 
+    // 準備フェーズの範囲外チェック
+    if (currentIndex >= nLevel) {
+      const practiceTrials = nLevel;
+      const totalRequiredTrials = practiceTrials + SCORED_TRIALS;
+      
+      if (currentIndex >= totalRequiredTrials) {
+        console.log(`🏁 範囲外アクセス防止: currentIndex=${currentIndex} >= totalRequiredTrials=${totalRequiredTrials}`);
+        return;
+      }
+    }
+
     // タイルを表示
     const isPreparationPhase = currentIndex < nLevel;
     console.log(`🎯 フェーズ判定: currentIndex=${currentIndex}, nLevel=${nLevel}, isPreparationPhase=${isPreparationPhase}`);
+    console.log(`🎯 準備フェーズ詳細: レベル${nLevel}は${nLevel}回の準備が必要、現在${currentIndex + 1}回目`);
+    
+    if (isPreparationPhase) {
+      console.log(`✅ 準備フェーズ実行中: ${currentIndex + 1}/${nLevel}`);
+    } else {
+      console.log(`🚀 本番フェーズ開始: ${currentIndex + 1}回目 (比較対象: ${currentIndex - nLevel + 1}回目)`);
+    }
     
     setGameState(prev => ({
       ...prev,
@@ -521,7 +539,9 @@ export default function NBackGame() {
           
           return baseNewState;
         });
+        
       });
+      
     }, TILE_DISPLAY_DURATION - FADE_OUT_DURATION);
   }, [gameState, fadeAnim, scaleAnim, glowAnim, sparkleAnim, executeEvaluation, feedbackAnim, confettiAnim, bounceAnim]);
 
@@ -561,22 +581,54 @@ export default function NBackGame() {
     });
   }, [gameState.buttonsEnabled, gameState.colorButtonPressed, gameState.positionButtonPressed, bounceAnim]);
 
-  // ゲームループ
+  // ゲームループ：開始時のみ実行
   useEffect(() => {
-    if (gameState.isPlaying && gameState.gamePhase === 'playing') {
-      console.log(`🎮 ゲームループ開始: currentIndex=${gameState.currentIndex}`);
+    if (gameState.isPlaying && gameState.gamePhase === 'playing' && gameState.currentIndex === 0) {
+      console.log(`🎮 ゲーム開始: レベル${gameState.nLevel}で新しいゲームを開始`);
+      
+      // 最初のタイルを表示
       const timer = setTimeout(() => {
-        console.log(`🎮 タイマー実行: currentIndex=${gameState.currentIndex}`);
+        console.log(`🎮 最初のタイル表示開始`);
         showNextTrial();
-      }, gameState.currentIndex === 0 ? 1000 : 
-           gameState.currentIndex < gameState.nLevel ? 2500 : 3000); // 最初1秒、準備フェーズ2.5秒、本番3秒
+      }, 1000);
 
       return () => {
-        console.log(`🎮 タイマーをクリア: currentIndex=${gameState.currentIndex}`);
+        console.log(`🎮 開始タイマーをクリア`);
         clearTimeout(timer);
       };
     }
-  }, [gameState.isPlaying, gameState.currentIndex, gameState.gamePhase, gameState.nLevel, showNextTrial]);
+  }, [gameState.isPlaying, gameState.gamePhase]);
+
+  // 自動進行ループ：currentIndexが更新されたときに次のタイルを表示
+  useEffect(() => {
+    if (gameState.isPlaying && gameState.gamePhase === 'playing' && gameState.currentIndex > 0) {
+      const practiceTrials = gameState.nLevel;
+      const totalRequiredTrials = practiceTrials + SCORED_TRIALS;
+      
+      console.log(`🔄 自動進行useEffect: currentIndex=${gameState.currentIndex}, total=${totalRequiredTrials}`);
+      
+      if (gameState.currentIndex >= totalRequiredTrials) {
+        console.log(`🏁 ゲーム終了: ${gameState.currentIndex} >= ${totalRequiredTrials}`);
+        setGameState(prev => ({
+          ...prev,
+          isPlaying: false,
+          gamePhase: 'finished'
+        }));
+        return;
+      }
+      
+      // 次のタイルを表示（タイマーで遅延）
+      const timer = setTimeout(() => {
+        console.log(`⏭️ 自動進行タイマー実行: ${gameState.currentIndex}回目のタイル表示`);
+        showNextTrial();
+      }, 3000); // 3秒間隔
+      
+      return () => {
+        console.log(`🔄 自動進行タイマークリア`);
+        clearTimeout(timer);
+      };
+    }
+  }, [gameState.currentIndex, gameState.isPlaying, gameState.gamePhase, gameState.nLevel, showNextTrial]);
 
   // 現在のタイル情報を取得
   const getCurrentTile = () => {
@@ -745,6 +797,25 @@ export default function NBackGame() {
               </Pressable>
             ))}
           </View>
+          
+          {/* ホームへ戻るボタン */}
+          <Pressable
+            style={styles.homeButtonSetup}
+            onPress={() => {
+              // ホーム画面に戻る（ルーターナビゲーションが必要）
+              console.log('ホーム画面への遷移');
+              // TODO: React Navigationまたはホーム画面へのナビゲーション
+            }}
+          >
+            <LinearGradient
+              colors={['#FF6347', '#DC143C', '#FF6347']}
+              style={styles.homeButtonSetupGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Text style={styles.homeButtonSetupText}>🏠 ホームにもどる 🏠</Text>
+            </LinearGradient>
+          </Pressable>
         </View>
       )}
 
@@ -804,31 +875,33 @@ export default function NBackGame() {
             <Text style={styles.levelText}>レベル: {gameState.nLevel}</Text>
           </View>
           
-          {/* フェーズメッセージ */}
-          {gameState.isPreparationPhase && (
-            <View style={styles.preparationContainer}>
-              <Text style={styles.preparationText}>
-                👀 よくみよう 👀
-              </Text>
-              <Text style={styles.preparationDetail}>
-                {gameState.nLevel === 1 && `1つめのタイルをおぼえよう！ (${gameState.currentIndex + 1}/1)`}
-                {gameState.nLevel === 2 && `${gameState.currentIndex + 1}つめのタイルをおぼえよう！ (${gameState.currentIndex + 1}/2)`}
-                {gameState.nLevel === 3 && `${gameState.currentIndex + 1}つめのタイルをおぼえよう！ (${gameState.currentIndex + 1}/3)`}
-              </Text>
-            </View>
-          )}
-          
-          {/* 選択開始メッセージ */}
-          {!gameState.isPreparationPhase && gameState.currentIndex === gameState.nLevel && gameState.showingStimulus && (
-            <View style={styles.startContainer}>
-              <Text style={styles.startText}>
-                🚀 はじめ！ 🚀
-              </Text>
-              <Text style={styles.startDetail}>
-                {gameState.nLevel}つまえとおなじかな？
-              </Text>
-            </View>
-          )}
+          {/* フェーズメッセージを固定高さにして、グリッドの位置を安定させる */}
+          <View style={styles.messageContainer}>
+            {gameState.isPreparationPhase && gameState.currentIndex < gameState.nLevel && (
+              <View style={styles.preparationContainer}>
+                <Text style={styles.preparationText}>
+                  👀 よくみよう 👀
+                </Text>
+                <Text style={styles.preparationDetail}>
+                  {gameState.nLevel === 1 && `1つめのタイルをおぼえよう！ (${gameState.currentIndex + 1}/1)`}
+                  {gameState.nLevel === 2 && `${gameState.currentIndex + 1}つめのタイルをおぼえよう！ (${gameState.currentIndex + 1}/2)`}
+                  {gameState.nLevel === 3 && `${gameState.currentIndex + 1}つめのタイルをおぼえよう！ (${gameState.currentIndex + 1}/3)`}
+                </Text>
+              </View>
+            )}
+            
+            {/* 選択開始メッセージ */}
+            {!gameState.isPreparationPhase && gameState.currentIndex === gameState.nLevel && gameState.showingStimulus && (
+              <View style={styles.startContainer}>
+                <Text style={styles.startText}>
+                  🚀 はじめ！ 🚀
+                </Text>
+                <Text style={styles.startDetail}>
+                  {gameState.nLevel}つまえとおなじかな？
+                </Text>
+              </View>
+            )}
+          </View>
           
           <View style={[styles.grid, { width: gridSize, height: gridSize }]}>
             {Array.from({ length: 9 }, (_, i) => renderTile(i))}
@@ -1049,8 +1122,9 @@ export default function NBackGame() {
           </View>
           
           <View style={styles.resultButtonsContainer}>
+            {/* もういちど */}
             <Pressable
-              style={[styles.restartButton, styles.resultButton]}
+              style={styles.resultButtonWide}
               onPress={() => {
                 // 終了時の祝福アニメーション開始
                 Animated.parallel([
@@ -1095,16 +1169,17 @@ export default function NBackGame() {
             >
               <LinearGradient
                 colors={['#FF69B4', '#FF1493', '#FF69B4']}
-                style={styles.restartButtonGradient}
+                style={styles.resultButtonGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                <Text style={styles.restartButtonText}>🎮 もういちど 🎮</Text>
+                <Text style={styles.resultButtonText}>🎮 もういちど 🎮</Text>
               </LinearGradient>
             </Pressable>
             
+            {/* レベルをえらびなおす */}
             <Pressable
-              style={[styles.homeButton, styles.resultButton]}
+              style={styles.resultButtonWide}
               onPress={() => {
                 setGameState(prev => ({
                   ...prev,
@@ -1117,18 +1192,38 @@ export default function NBackGame() {
                   positionButtonPressed: false,
                   showingFeedback: false,
                   isPreparationPhase: false,
+                  isPlaying: false,
                 }));
                 confettiAnim.setValue(0);
                 bounceAnim.setValue(0);
               }}
             >
               <LinearGradient
-                colors={['#00CED1', '#20B2AA', '#00CED1']}
-                style={styles.homeButtonGradient}
+                colors={['#32CD32', '#228B22', '#32CD32']}
+                style={styles.resultButtonGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                <Text style={styles.homeButtonText}>🏠 トップにもどる 🏠</Text>
+                <Text style={styles.resultButtonText}>🔄 レベルをえらびなおす 🔄</Text>
+              </LinearGradient>
+            </Pressable>
+            
+            {/* ホームにもどる */}
+            <Pressable
+              style={styles.resultButtonWide}
+              onPress={() => {
+                // ホーム画面に戻る（ルーターナビゲーションが必要）
+                console.log('ホーム画面への遷移');
+                // TODO: React Navigationまたはホーム画面へのナビゲーション
+              }}
+            >
+              <LinearGradient
+                colors={['#FF6347', '#DC143C', '#FF6347']}
+                style={styles.resultButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Text style={styles.resultButtonText}>🏠 ホームにもどる 🏠</Text>
               </LinearGradient>
             </Pressable>
           </View>
@@ -1263,11 +1358,16 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
+  messageContainer: {
+    minHeight: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   preparationContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 15,
     padding: 15,
-    marginBottom: 20,
     borderWidth: 3,
     borderColor: '#FFD700',
     alignItems: 'center',
@@ -1586,14 +1686,72 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   resultButtonsContainer: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 15,
     justifyContent: 'center',
     alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 20,
   },
   resultButton: {
     flex: 1,
     maxWidth: 150,
+  },
+  resultButtonWide: {
+    width: '100%',
+    maxWidth: 350,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderRadius: 25,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  resultButtonGradient: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resultButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    textShadowColor: '#000',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  homeButtonSetup: {
+    marginTop: 20,
+    paddingHorizontal: 30,
+    paddingVertical: 15,
+    borderRadius: 25,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    alignSelf: 'center',
+  },
+  homeButtonSetupGradient: {
+    paddingHorizontal: 30,
+    paddingVertical: 15,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeButtonSetupText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    textShadowColor: '#000',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   homeButton: {
     paddingHorizontal: 25,
