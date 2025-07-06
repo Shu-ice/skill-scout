@@ -13,7 +13,11 @@
       "mcp__playwright__browser_navigate",
       "mcp__playwright__browser_install",
       "Bash(ls:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(pkill:*)",
+      "Bash(true)",
+      "Bash(rm:*)",
+      "Bash(npx expo start:*)"
     ],
     "deny": []
   }

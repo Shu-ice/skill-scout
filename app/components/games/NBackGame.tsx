@@ -23,6 +23,7 @@ interface GameState {
   positionButtonPressed: boolean;
   buttonsEnabled: boolean;
   lastFeedbackMessage: string;
+  isPreparationPhase: boolean;
 }
 
 const COLORS = ['#FF0000', '#0000FF', '#FFFF00']; // あか、あお、きいろ
@@ -30,6 +31,25 @@ const SCORED_TRIALS = 20; // スコア計算対象の問題数
 const TILE_DISPLAY_DURATION = 2000; // タイル表示時間（2秒間）
 const FADE_IN_DURATION = 500;        // フェードイン時間（0.5秒）
 const FADE_OUT_DURATION = 500;       // フェードアウト時間（0.5秒）
+
+// デバッグ用ヘルパー関数
+const getPositionName = (position: number): string => {
+  const positions = [
+    '左上', '中上', '右上',
+    '左中', '中央', '右中', 
+    '左下', '中下', '右下'
+  ];
+  return positions[position] || `位置${position}`;
+};
+
+const getColorName = (color: string): string => {
+  switch(color) {
+    case '#FF0000': return 'あか';
+    case '#0000FF': return 'あお';
+    case '#FFFF00': return 'きいろ';
+    default: return color;
+  }
+};
 
 export default function NBackGame() {
   const [gameState, setGameState] = useState<GameState>({
@@ -48,6 +68,7 @@ export default function NBackGame() {
     positionButtonPressed: false,
     buttonsEnabled: false,
     lastFeedbackMessage: '',
+    isPreparationPhase: false,
   });
 
   const [fadeAnim] = useState(new Animated.Value(0));
@@ -96,12 +117,32 @@ export default function NBackGame() {
       buttonsEnabled: false,
       showingFeedback: false,
       lastFeedbackMessage: '',
+      isPreparationPhase: false,
     }));
   }, [generateTrials]);
 
-  // 安全な回答評価関数（パラメータで受け取り）
-  const evaluateResponseWithCurrentState = useCallback((currentIndex: number, nLevel: number, colorButtonPressed: boolean, positionButtonPressed: boolean) => {
+  // 同期的な判定実行関数
+  const executeEvaluation = useCallback((currentIndex: number, nLevel: number, colorButtonPressed: boolean, positionButtonPressed: boolean) => {
     const { trials } = gameState;
+    
+    // 🔍 各レベル専用デバッグ情報
+    if (nLevel === 1) {
+      console.log('🔥 === レベル1専用デバッグ ===');
+      console.log(`📍 現在の試行: ${currentIndex}, 比較対象: ${currentIndex - 1}`);
+      console.log(`🎯 実際の比較: trials[${currentIndex}] vs trials[${currentIndex - 1}]`);
+    }
+    
+    if (nLevel === 2) {
+      console.log('🔥 === レベル2専用デバッグ ===');
+      console.log(`📍 現在の試行: ${currentIndex}, 比較対象: ${currentIndex - 2}`);
+      console.log(`🎯 実際の比較: trials[${currentIndex}] vs trials[${currentIndex - 2}]`);
+    }
+    
+    if (nLevel === 3) {
+      console.log('🔥 === レベル3専用デバッグ ===');
+      console.log(`📍 現在の試行: ${currentIndex}, 比較対象: ${currentIndex - 3}`);
+      console.log(`🎯 実際の比較: trials[${currentIndex}] vs trials[${currentIndex - 3}]`);
+    }
     
     // 厳密な境界チェック（世界最高品質）
     const compareIndex = currentIndex - nLevel;
@@ -115,12 +156,26 @@ export default function NBackGame() {
     
     // デバッグ情報をログ出力
     console.log('=== 🔍 正誤判定デバッグ（世界最高品質） ===');
-    console.log('📊 currentIndex:', currentIndex);
-    console.log('📊 nLevel:', nLevel);
-    console.log('📊 比較対象インデックス:', compareIndex);
-    console.log('🎯 現在のタイル:', currentTrial);
-    console.log('🎯 比較対象タイル:', nBackTrial);
-    console.log('🎮 ボタン状態 - いろ:', colorButtonPressed, 'ばしょ:', positionButtonPressed);
+    console.log('📊 レベル:', nLevel, '（' + nLevel + 'つ前と比較）');
+    console.log('📊 現在のインデックス:', currentIndex);
+    console.log('📊 比較対象インデックス:', compareIndex, '（' + nLevel + 'つ前）');
+    console.log('🎯 現在のタイル:', {
+      index: currentIndex,
+      position: currentTrial.position,
+      color: currentTrial.color,
+      positionName: getPositionName(currentTrial.position),
+      colorName: getColorName(currentTrial.color)
+    });
+    console.log('🎯 比較対象タイル:', {
+      index: compareIndex,
+      position: nBackTrial.position,
+      color: nBackTrial.color,
+      positionName: getPositionName(nBackTrial.position),
+      colorName: getColorName(nBackTrial.color)
+    });
+    console.log('🎮 プレイヤーの操作:');
+    console.log('   - いろボタン:', colorButtonPressed ? '✅ 押した' : '❌ 押さない');
+    console.log('   - ばしょボタン:', positionButtonPressed ? '✅ 押した' : '❌ 押さない');
     
     // 最終安全性チェック
     if (!currentTrial || !nBackTrial) {
@@ -134,22 +189,69 @@ export default function NBackGame() {
     console.log('🎯 位置が同じ:', samePosition, `(${currentTrial.position} === ${nBackTrial.position})`);
     console.log('🎨 色が同じ:', sameColor, `(${currentTrial.color} === ${nBackTrial.color})`);
     
-    // 正誤判定の詳細ロジック
+    // 🔍 レベル1専用：1つ前との比較確認
+    if (nLevel === 1) {
+      console.log('🔥 === レベル1：1つ前との比較詳細 ===');
+      console.log(`📍 現在のタイル[${currentIndex}]: 位置${currentTrial.position}, 色${currentTrial.color}`);
+      console.log(`📍 1つ前のタイル[${compareIndex}]: 位置${nBackTrial.position}, 色${nBackTrial.color}`);
+      console.log(`🎯 位置判定: ${currentTrial.position} === ${nBackTrial.position} → ${samePosition}`);
+      console.log(`🎨 色判定: ${currentTrial.color} === ${nBackTrial.color} → ${sameColor}`);
+    }
+    
+    // 🔍 レベル2専用：2つ前との比較確認
+    if (nLevel === 2) {
+      console.log('🔥 === レベル2：2つ前との比較詳細 ===');
+      console.log(`📍 現在のタイル[${currentIndex}]: 位置${currentTrial.position}, 色${currentTrial.color}`);
+      console.log(`📍 2つ前のタイル[${compareIndex}]: 位置${nBackTrial.position}, 色${nBackTrial.color}`);
+      console.log(`🎯 位置判定: ${currentTrial.position} === ${nBackTrial.position} → ${samePosition}`);
+      console.log(`🎨 色判定: ${currentTrial.color} === ${nBackTrial.color} → ${sameColor}`);
+    }
+    
+    // 🔍 レベル3専用：3つ前との比較確認
+    if (nLevel === 3) {
+      console.log('🔥 === レベル3：3つ前との比較詳細 ===');
+      console.log(`📍 現在のタイル[${currentIndex}]: 位置${currentTrial.position}, 色${currentTrial.color}`);
+      console.log(`📍 3つ前のタイル[${compareIndex}]: 位置${nBackTrial.position}, 色${nBackTrial.color}`);
+      console.log(`🎯 位置判定: ${currentTrial.position} === ${nBackTrial.position} → ${samePosition}`);
+      console.log(`🎨 色判定: ${currentTrial.color} === ${nBackTrial.color} → ${sameColor}`);
+    }
+    
+    // 🔥 完璧な正誤判定ロジック
+    console.log('🔍 === 判定ロジック詳細分析 ===');
+    console.log(`🎯 比較結果: 位置${samePosition ? '同じ' : '違う'}, 色${sameColor ? '同じ' : '違う'}`);
+    console.log(`🎮 ボタン状況: いろ${colorButtonPressed ? '押下' : '未押下'}, ばしょ${positionButtonPressed ? '押下' : '未押下'}`);
+    
+    // 色の判定：同じ色なら「いろ」ボタンを押すべき、違う色なら押さないべき
     const colorCorrect = (sameColor && colorButtonPressed) || (!sameColor && !colorButtonPressed);
+    console.log(`🎨 色判定詳細: sameColor=${sameColor}, colorButtonPressed=${colorButtonPressed}`);
+    console.log(`🎨 色判定結果: (${sameColor} && ${colorButtonPressed}) || (!${sameColor} && !${colorButtonPressed}) = ${colorCorrect}`);
+    
+    // 位置の判定：同じ位置なら「ばしょ」ボタンを押すべき、違う位置なら押さないべき
     const positionCorrect = (samePosition && positionButtonPressed) || (!samePosition && !positionButtonPressed);
+    console.log(`📍 位置判定詳細: samePosition=${samePosition}, positionButtonPressed=${positionButtonPressed}`);
+    console.log(`📍 位置判定結果: (${samePosition} && ${positionButtonPressed}) || (!${samePosition} && !${positionButtonPressed}) = ${positionCorrect}`);
+    
+    // 総合判定：両方正解で初めて正解
     const isCorrect = colorCorrect && positionCorrect;
+    console.log(`🏆 総合判定: ${colorCorrect} && ${positionCorrect} = ${isCorrect}`);
+    console.log('🔍 === 判定ロジック分析終了 ===');
     
-    console.log('✅ 色の判定:', sameColor ? '同じ色' : '違う色', '→', colorButtonPressed ? 'ボタン押下' : 'ボタン未押下', '→', colorCorrect ? '正解' : '不正解');
-    console.log('✅ 位置の判定:', samePosition ? '同じ位置' : '違う位置', '→', positionButtonPressed ? 'ボタン押下' : 'ボタン未押下', '→', positionCorrect ? '正解' : '不正解');
-    console.log('🏆 総合判定:', isCorrect ? '✅ 正解！' : '❌ 不正解！');
+    // スコア計算対象かどうか（シンプルで確実な方法）
+    // 最初のnLevel個は練習問題、その後のSCORED_TRIALS個がスコア対象
+    const practiceTrials = nLevel;
+    const scoringStartIndex = practiceTrials;
+    const scoringEndIndex = practiceTrials + SCORED_TRIALS - 1;
+    const isScored = currentIndex >= scoringStartIndex && currentIndex <= scoringEndIndex;
     
-    // スコア計算対象かどうか
-    const isScored = currentIndex >= nLevel + (trials.length - nLevel - SCORED_TRIALS);
-    
-    console.log('📈 スコア対象:', isScored, `(${currentIndex} >= ${nLevel + (trials.length - nLevel - SCORED_TRIALS)})`);
+    console.log('📈 スコア計算詳細:');
+    console.log('   練習問題数:', practiceTrials);
+    console.log('   スコア対象開始:', scoringStartIndex);
+    console.log('   スコア対象終了:', scoringEndIndex);
+    console.log('   現在のインデックス:', currentIndex);
+    console.log('   スコア対象:', isScored);
     console.log('🎯 試行総数:', trials.length);
     
-    // 楽しいフィードバックメッセージ
+    // シンプルなフィードバックメッセージ（正解 or 不正解）
     let feedbackMessage = '';
     if (isCorrect) {
       const successMessages = [
@@ -161,98 +263,37 @@ export default function NBackGame() {
         '🎊 だいせいかい！'
       ];
       feedbackMessage = successMessages[Math.floor(Math.random() * successMessages.length)];
-    } else if (colorCorrect || positionCorrect) {
-      const partialMessages = [
-        '😊 おしい！',
-        '🤗 もうすこし！',
-        '💪 がんばって！',
-        '🌸 あとちょっと！'
-      ];
-      feedbackMessage = partialMessages[Math.floor(Math.random() * partialMessages.length)];
     } else {
-      const tryAgainMessages = [
+      const incorrectMessages = [
         '🤔 もう一度！',
         '🌟 つぎがんばろう！',
         '😄 だいじょうぶ！',
-        '🎈 また挑戦！'
+        '🎈 また挑戦！',
+        '💪 がんばって！',
+        '🤗 つぎはできるよ！'
       ];
-      feedbackMessage = tryAgainMessages[Math.floor(Math.random() * tryAgainMessages.length)];
+      feedbackMessage = incorrectMessages[Math.floor(Math.random() * incorrectMessages.length)];
     }
     
-    setGameState(prev => ({
-      ...prev,
-      score: prev.score + (isCorrect && isScored ? 1 : 0),
-      totalTrials: prev.totalTrials + (isScored ? 1 : 0),
-      scoredTrialsCount: prev.scoredTrialsCount + (isScored ? 1 : 0),
-      lastResponseCorrect: isCorrect,
-      showingFeedback: true,
-      lastFeedbackMessage: feedbackMessage,
-    }));
+    // 結果オブジェクトを返す（setGameStateは呼ばない）
+    const result = {
+      isCorrect,
+      feedbackMessage,
+      scoreIncrement: isCorrect && isScored ? 1 : 0,
+      totalTrialsIncrement: isScored ? 1 : 0,
+      scoredTrialsIncrement: isScored ? 1 : 0,
+    };
     
-    // 楽しいフィードバックアニメーション
-    if (isCorrect) {
-      // 正解時の紙吹雪エフェクト
-      Animated.parallel([
-        Animated.sequence([
-          Animated.timing(feedbackAnim, {
-            toValue: 1,
-            duration: 200,
-            easing: Easing.elastic(1.5),
-            useNativeDriver: true,
-          }),
-          Animated.timing(feedbackAnim, {
-            toValue: 0,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.sequence([
-          Animated.timing(confettiAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-          Animated.timing(confettiAnim, {
-            toValue: 0,
-            duration: 1200,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.sequence([
-          Animated.timing(bounceAnim, {
-            toValue: 1,
-            duration: 400,
-            easing: Easing.bounce,
-            useNativeDriver: true,
-          }),
-          Animated.timing(bounceAnim, {
-            toValue: 0,
-            duration: 600,
-            useNativeDriver: true,
-          }),
-        ]),
-      ]).start();
-    } else {
-      // 間違い時の優しいアニメーション
-      Animated.sequence([
-        Animated.timing(feedbackAnim, {
-          toValue: 1,
-          duration: 300,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(feedbackAnim, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [gameState, feedbackAnim, confettiAnim, bounceAnim]);
+    // アニメーションは showNextTrial 内で実行するため、ここでは結果のみ返す
+    
+    return result;
+  }, [gameState]);
 
   // 次の試行を表示
   const showNextTrial = useCallback(() => {
-    const { trials, currentIndex, nLevel } = gameState;
+    const { currentIndex, nLevel } = gameState;
+    
+    console.log(`🚀 showNextTrial実行開始: currentIndex=${currentIndex}, nLevel=${nLevel}`);
     
     // アニメーション値をリセット
     fadeAnim.setValue(0);
@@ -260,7 +301,12 @@ export default function NBackGame() {
     glowAnim.setValue(0);
     sparkleAnim.setValue(0);
     
-    if (currentIndex >= trials.length) {
+    // ゲーム終了条件を修正
+    const practiceTrials = nLevel;
+    const totalRequiredTrials = practiceTrials + SCORED_TRIALS;
+    
+    if (currentIndex >= totalRequiredTrials) {
+      console.log(`🏁 ゲーム終了: currentIndex=${currentIndex} >= totalRequiredTrials=${totalRequiredTrials}`);
       // ゲーム終了
       setGameState(prev => ({
         ...prev,
@@ -273,13 +319,18 @@ export default function NBackGame() {
     }
 
     // タイルを表示
+    const isPreparationPhase = currentIndex < nLevel;
+    console.log(`🎯 フェーズ判定: currentIndex=${currentIndex}, nLevel=${nLevel}, isPreparationPhase=${isPreparationPhase}`);
+    
     setGameState(prev => ({
       ...prev,
       showingStimulus: true,
-      buttonsEnabled: currentIndex >= nLevel, // N回目以降はボタンを有効化
+      buttonsEnabled: !isPreparationPhase, // 準備フェーズではボタン無効
+      // ボタン状態は新しいタイル表示時のみリセット（判定前ではない）
       colorButtonPressed: false,
       positionButtonPressed: false,
       showingFeedback: false,
+      isPreparationPhase: isPreparationPhase,
     }));
 
     // 魔法のようなキラキラ登場アニメーション
@@ -359,25 +410,130 @@ export default function NBackGame() {
         }),
       ]).start(() => {
         // 判定を先に実行（currentIndexが変わる前に）
-        if (currentIndex >= nLevel) {
-          // 現在の状態で判定を実行
-          evaluateResponseWithCurrentState(currentIndex, nLevel, gameState.colorButtonPressed, gameState.positionButtonPressed);
-        }
-        
-        // 次の試行へ進む
-        setGameState(prev => ({
-          ...prev,
-          currentIndex: prev.currentIndex + 1,
-          showingStimulus: false,
-          buttonsEnabled: false,
-        }));
+        // レベル1: 1つ前と比較するので、currentIndex >= 1 で判定開始
+        // レベル2: 2つ前と比較するので、currentIndex >= 2 で判定開始  
+        // レベル3: 3つ前と比較するので、currentIndex >= 3 で判定開始
+        // 🔧 完全修正: すべてsetGameState内で現在の状態を使用し、判定も同期的に処理
+        setGameState(prev => {
+          const currentIdx = prev.currentIndex;
+          console.log(`🎯 判定チェック: currentIndex=${currentIdx}, nLevel=${nLevel}`);
+          
+          let evaluationResult = null;
+          
+          if (currentIdx >= nLevel) {
+            console.log(`🎯 判定実行: currentIndex=${currentIdx}, nLevel=${nLevel}`);
+            console.log(`🎮 判定時ボタン状態: color=${prev.colorButtonPressed}, position=${prev.positionButtonPressed}`);
+            console.log(`🔥 重要: これらのボタン状態で判定を実行します！`);
+            
+            // 同期的に判定を実行
+            evaluationResult = executeEvaluation(currentIdx, nLevel, prev.colorButtonPressed, prev.positionButtonPressed);
+          } else {
+            console.log(`⏭️ 判定スキップ: currentIndex=${currentIdx} < nLevel=${nLevel} (まだ比較できない)`);
+          }
+          
+          // 次の試行へ進む（ボタン状態もリセット）
+          const newIndex = currentIdx + 1;
+          console.log(`🔄 インデックス更新: ${currentIdx} → ${newIndex}`);
+          
+          // 判定結果をstateに反映
+          const baseNewState = {
+            ...prev,
+            currentIndex: newIndex,
+            showingStimulus: false,
+            buttonsEnabled: false,
+            colorButtonPressed: false,
+            positionButtonPressed: false,
+          };
+          
+          if (evaluationResult) {
+            // フィードバックアニメーションを実行
+            setTimeout(() => {
+              if (evaluationResult.isCorrect) {
+                // 正解時の紙吹雪エフェクト
+                Animated.parallel([
+                  Animated.sequence([
+                    Animated.timing(feedbackAnim, {
+                      toValue: 1,
+                      duration: 200,
+                      easing: Easing.elastic(1.5),
+                      useNativeDriver: true,
+                    }),
+                    Animated.timing(feedbackAnim, {
+                      toValue: 0,
+                      duration: 1500,
+                      useNativeDriver: true,
+                    }),
+                  ]),
+                  Animated.sequence([
+                    Animated.timing(confettiAnim, {
+                      toValue: 1,
+                      duration: 300,
+                      useNativeDriver: true,
+                    }),
+                    Animated.timing(confettiAnim, {
+                      toValue: 0,
+                      duration: 1200,
+                      useNativeDriver: true,
+                    }),
+                  ]),
+                  Animated.sequence([
+                    Animated.timing(bounceAnim, {
+                      toValue: 1,
+                      duration: 400,
+                      easing: Easing.bounce,
+                      useNativeDriver: true,
+                    }),
+                    Animated.timing(bounceAnim, {
+                      toValue: 0,
+                      duration: 600,
+                      useNativeDriver: true,
+                    }),
+                  ]),
+                ]).start();
+              } else {
+                // 間違い時の優しいアニメーション
+                Animated.sequence([
+                  Animated.timing(feedbackAnim, {
+                    toValue: 1,
+                    duration: 300,
+                    easing: Easing.out(Easing.cubic),
+                    useNativeDriver: true,
+                  }),
+                  Animated.timing(feedbackAnim, {
+                    toValue: 0,
+                    duration: 1000,
+                    useNativeDriver: true,
+                  }),
+                ]).start();
+              }
+            }, 100);
+            
+            return {
+              ...baseNewState,
+              score: prev.score + evaluationResult.scoreIncrement,
+              totalTrials: prev.totalTrials + evaluationResult.totalTrialsIncrement,
+              scoredTrialsCount: prev.scoredTrialsCount + evaluationResult.scoredTrialsIncrement,
+              lastResponseCorrect: evaluationResult.isCorrect,
+              showingFeedback: true,
+              lastFeedbackMessage: evaluationResult.feedbackMessage,
+            };
+          }
+          
+          return baseNewState;
+        });
       });
     }, TILE_DISPLAY_DURATION - FADE_OUT_DURATION);
-  }, [gameState, fadeAnim, scaleAnim, glowAnim, sparkleAnim, evaluateResponseWithCurrentState]);
+  }, [gameState, fadeAnim, scaleAnim, glowAnim, sparkleAnim, executeEvaluation, feedbackAnim, confettiAnim, bounceAnim]);
 
   // ボタン押下ハンドラー
   const handleButtonPress = useCallback((buttonType: 'color' | 'position') => {
-    if (!gameState.buttonsEnabled) return;
+    if (!gameState.buttonsEnabled) {
+      console.log(`🚫 ボタン無効: ${buttonType}ボタンが押されましたが無効です`);
+      return;
+    }
+    
+    console.log(`🎮 ボタン押下: ${buttonType}ボタンが押されました`);
+    console.log(`🎮 押下前状態: color=${gameState.colorButtonPressed}, position=${gameState.positionButtonPressed}`);
     
     // ボタン押下時の楽しいアニメーション
     Animated.sequence([
@@ -395,22 +551,32 @@ export default function NBackGame() {
       }),
     ]).start();
     
-    setGameState(prev => ({
-      ...prev,
-      [buttonType + 'ButtonPressed']: true,
-    }));
-  }, [gameState.buttonsEnabled, bounceAnim]);
+    setGameState(prev => {
+      const newState = {
+        ...prev,
+        [buttonType + 'ButtonPressed']: true,
+      };
+      console.log(`🎮 押下後状態: color=${buttonType === 'color' ? true : prev.colorButtonPressed}, position=${buttonType === 'position' ? true : prev.positionButtonPressed}`);
+      return newState;
+    });
+  }, [gameState.buttonsEnabled, gameState.colorButtonPressed, gameState.positionButtonPressed, bounceAnim]);
 
   // ゲームループ
   useEffect(() => {
     if (gameState.isPlaying && gameState.gamePhase === 'playing') {
+      console.log(`🎮 ゲームループ開始: currentIndex=${gameState.currentIndex}`);
       const timer = setTimeout(() => {
+        console.log(`🎮 タイマー実行: currentIndex=${gameState.currentIndex}`);
         showNextTrial();
-      }, gameState.currentIndex === 0 ? 1000 : 3000); // 最初の試行は1秒待機、その後は3秒間隔（2秒表示+1秒休憩）
+      }, gameState.currentIndex === 0 ? 1000 : 
+           gameState.currentIndex < gameState.nLevel ? 2500 : 3000); // 最初1秒、準備フェーズ2.5秒、本番3秒
 
-      return () => clearTimeout(timer);
+      return () => {
+        console.log(`🎮 タイマーをクリア: currentIndex=${gameState.currentIndex}`);
+        clearTimeout(timer);
+      };
     }
-  }, [gameState.isPlaying, gameState.currentIndex, gameState.gamePhase, showNextTrial]);
+  }, [gameState.isPlaying, gameState.currentIndex, gameState.gamePhase, gameState.nLevel, showNextTrial]);
 
   // 現在のタイル情報を取得
   const getCurrentTile = () => {
@@ -637,6 +803,32 @@ export default function NBackGame() {
             <Text style={styles.scoreText}>てんすう: {gameState.score}/{gameState.totalTrials}</Text>
             <Text style={styles.levelText}>レベル: {gameState.nLevel}</Text>
           </View>
+          
+          {/* フェーズメッセージ */}
+          {gameState.isPreparationPhase && (
+            <View style={styles.preparationContainer}>
+              <Text style={styles.preparationText}>
+                👀 よくみよう 👀
+              </Text>
+              <Text style={styles.preparationDetail}>
+                {gameState.nLevel === 1 && `1つめのタイルをおぼえよう！ (${gameState.currentIndex + 1}/1)`}
+                {gameState.nLevel === 2 && `${gameState.currentIndex + 1}つめのタイルをおぼえよう！ (${gameState.currentIndex + 1}/2)`}
+                {gameState.nLevel === 3 && `${gameState.currentIndex + 1}つめのタイルをおぼえよう！ (${gameState.currentIndex + 1}/3)`}
+              </Text>
+            </View>
+          )}
+          
+          {/* 選択開始メッセージ */}
+          {!gameState.isPreparationPhase && gameState.currentIndex === gameState.nLevel && gameState.showingStimulus && (
+            <View style={styles.startContainer}>
+              <Text style={styles.startText}>
+                🚀 はじめ！ 🚀
+              </Text>
+              <Text style={styles.startDetail}>
+                {gameState.nLevel}つまえとおなじかな？
+              </Text>
+            </View>
+          )}
           
           <View style={[styles.grid, { width: gridSize, height: gridSize }]}>
             {Array.from({ length: 9 }, (_, i) => renderTile(i))}
@@ -876,17 +1068,26 @@ export default function NBackGame() {
                 ]).start();
                 
                 setTimeout(() => {
-                  setGameState(prev => ({
-                    ...prev,
-                    gamePhase: 'playing',
-                    currentIndex: 0,
-                    score: 0,
-                    totalTrials: 0,
-                    scoredTrialsCount: 0,
-                    colorButtonPressed: false,
-                    positionButtonPressed: false,
-                    showingFeedback: false,
-                  }));
+                  // 新しい試行データを生成してゲームを再開
+                  setGameState(prev => {
+                    const newTrials = generateTrials(prev.nLevel);
+                    return {
+                      ...prev,
+                      trials: newTrials,
+                      gamePhase: 'playing',
+                      currentIndex: 0,
+                      score: 0,
+                      totalTrials: 0,
+                      scoredTrialsCount: 0,
+                      colorButtonPressed: false,
+                      positionButtonPressed: false,
+                      showingFeedback: false,
+                      isPreparationPhase: false,
+                      showingStimulus: false,
+                      buttonsEnabled: false,
+                      isPlaying: true,
+                    };
+                  });
                   confettiAnim.setValue(0);
                   bounceAnim.setValue(0);
                 }, 1000);
@@ -915,6 +1116,7 @@ export default function NBackGame() {
                   colorButtonPressed: false,
                   positionButtonPressed: false,
                   showingFeedback: false,
+                  isPreparationPhase: false,
                 }));
                 confettiAnim.setValue(0);
                 bounceAnim.setValue(0);
@@ -1060,6 +1262,64 @@ const styles = StyleSheet.create({
     textShadowColor: '#FFD700',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
+  },
+  preparationContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 15,
+    padding: 15,
+    marginBottom: 20,
+    borderWidth: 3,
+    borderColor: '#FFD700',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  preparationText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FF1493',
+    textShadowColor: '#FFD700',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+    marginBottom: 5,
+  },
+  preparationDetail: {
+    fontSize: 16,
+    color: '#0066CC',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  startContainer: {
+    backgroundColor: 'rgba(255, 215, 0, 0.9)',
+    borderRadius: 15,
+    padding: 15,
+    marginBottom: 20,
+    borderWidth: 3,
+    borderColor: '#FF4500',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  startText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FF4500',
+    textShadowColor: '#FFF',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+    marginBottom: 5,
+  },
+  startDetail: {
+    fontSize: 16,
+    color: '#FF1493',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   grid: {
     position: 'relative',
