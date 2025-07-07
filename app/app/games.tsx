@@ -21,9 +21,11 @@ export default function Games() {
           <Text style={styles.comingSoon}>準備中</Text>
         </Pressable>
         
-        <Pressable style={[styles.gameItem, styles.disabledItem]}>
-          <Text style={[styles.gameText, styles.disabledText]}>⚡ フラッシュ暗算＆記号探し（処理速度）</Text>
-          <Text style={styles.comingSoon}>準備中</Text>
+        <Pressable 
+          style={styles.gameItem}
+          onPress={() => router.push('/games/flashmath')}
+        >
+          <Text style={styles.gameText}>⚡ フラッシュ暗算＆記号探し（処理速度）</Text>
         </Pressable>
         
         <Pressable 
