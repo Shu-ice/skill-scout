@@ -18,10 +18,10 @@ export default function CardSortGame({ onGameEnd }: CardSortGameProps) {
   const [gamePhase, setGamePhase] = useState<'intro' | 'playing' | 'end'>('intro');
   const [cardIndex, setCardIndex] = useState(0);
   const [correctAnswers, setCorrectAnswers] = useState(0);
-  const [totalCards, setTotalCards] = useState(20);
+  const [totalCards] = useState(20);
   
-  const fadeAnim = new Animated.Value(0);
-  const scaleAnim = new Animated.Value(1);
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [scaleAnim] = useState(new Animated.Value(1));
 
   // カードデータ生成
   const generateCards = (): Card[] => {

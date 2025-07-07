@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, Animated, Dimensions, Easing } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Animated, Dimensions, Easing, Platform, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Trial {
   position: number; // 0-8 (3x3グリッドの位置)
@@ -26,7 +28,7 @@ interface GameState {
   isPreparationPhase: boolean;
 }
 
-const COLORS = ['#FF0000', '#0000FF', '#FFFF00']; // あか、あお、きいろ
+const COLORS = ['#FF0000', '#0000FF', '#FF8C00']; // あか、あお、だいだいいろ
 const SCORED_TRIALS = 20; // スコア計算対象の問題数
 const TILE_DISPLAY_DURATION = 2000; // タイル表示時間（2秒間）
 const FADE_IN_DURATION = 500;        // フェードイン時間（0.5秒）
@@ -46,12 +48,26 @@ const getColorName = (color: string): string => {
   switch(color) {
     case '#FF0000': return 'あか';
     case '#0000FF': return 'あお';
-    case '#FFFF00': return 'きいろ';
+    case '#FF8C00': return 'だいだいいろ';
     default: return color;
   }
 };
 
 export default function NBackGame() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  
+  // 高度なレスポンシブ計算
+  const [screenData, setScreenData] = useState(() => {
+    const { width, height } = Dimensions.get('window');
+    return {
+      width,
+      height,
+      isSmallDevice: width < 375,
+      isTablet: width >= 768,
+      scale: width / 375, // iPhone基準のスケール
+    };
+  });
   const [gameState, setGameState] = useState<GameState>({
     trials: [],
     currentIndex: 0,
@@ -79,10 +95,52 @@ export default function NBackGame() {
   const [confettiAnim] = useState(new Animated.Value(0));
   const [sparkleAnim] = useState(new Animated.Value(0));
 
-  // 画面の幅を取得
-  const { width } = Dimensions.get('window');
-  const gridSize = Math.min(width - 60, 300);
-  const tileSize = gridSize / 3 - 8;
+  // レスポンシブデザインの監視
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenData({
+        width: window.width,
+        height: window.height,
+        isSmallDevice: window.width < 375,
+        isTablet: window.width >= 768,
+        scale: window.width / 375,
+      });
+    });
+
+    return () => subscription?.remove();
+  }, []);
+
+  // プロフェッショナルなグリッドサイズ計算
+  const getResponsiveGridSize = () => {
+    const baseSize = screenData.isTablet ? 400 : 280;
+    const padding = screenData.isSmallDevice ? 40 : 60;
+    const maxSize = screenData.width - padding;
+    // PCブラウザでの異常な大きさを防止
+    const scaledSize = baseSize * Math.min(screenData.scale, 1.5);
+    return Math.min(maxSize, scaledSize, 450); // 絶対上限を450pxに設定
+  };
+
+  const gridSize = getResponsiveGridSize();
+  const tileSize = (gridSize / 3) - (screenData.isSmallDevice ? 6 : 8);
+
+  // プロフェッショナル動的スタイル関数
+  const getResponsiveStyles = () => ({
+    fontSize: {
+      title: Math.max(20, Math.min(28, 32 * screenData.scale)),
+      subtitle: Math.max(14, Math.min(18, 20 * screenData.scale)),
+      button: Math.max(12, Math.min(16, 18 * screenData.scale)),
+      small: Math.max(10, Math.min(14, 14 * screenData.scale)),
+    },
+    spacing: {
+      small: Math.max(8, 12 * screenData.scale),
+      medium: Math.max(12, 20 * screenData.scale),
+      large: Math.max(20, 30 * screenData.scale),
+    },
+    buttonHeight: Math.max(44, Math.min(60, 50 * screenData.scale)), // タッチフレンドリー
+    buttonMinWidth: Math.max(100, Math.min(140, 150 * screenData.scale)),
+  });
+
+  const responsiveStyles = getResponsiveStyles();
 
   // 試行データを生成
   const generateTrials = useCallback((nLevel: number) => {
@@ -395,12 +453,14 @@ export default function NBackGame() {
       Animated.sequence([
         Animated.timing(sparkleAnim, {
           toValue: 1,
-          duration: 500,
+          duration: 800,
+          easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.timing(sparkleAnim, {
           toValue: 0,
-          duration: 500,
+          duration: 800,
+          easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
       ])
@@ -416,14 +476,15 @@ export default function NBackGame() {
       
       Animated.parallel([
         Animated.timing(scaleAnim, {
-          toValue: 0.8,
-          duration: 200,
+          toValue: 0.9,
+          duration: 150,
+          easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
         Animated.timing(fadeAnim, {
           toValue: 0,
           duration: FADE_OUT_DURATION,
-          easing: Easing.in(Easing.cubic),
+          easing: Easing.in(Easing.quad),
           useNativeDriver: true,
         }),
       ]).start(() => {
@@ -628,7 +689,7 @@ export default function NBackGame() {
         clearTimeout(timer);
       };
     }
-  }, [gameState.currentIndex, gameState.isPlaying, gameState.gamePhase, gameState.nLevel, showNextTrial]);
+  }, [gameState.currentIndex, gameState.isPlaying, gameState.gamePhase, gameState.nLevel]);
 
   // 現在のタイル情報を取得
   const getCurrentTile = () => {
@@ -713,7 +774,12 @@ export default function NBackGame() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { 
+      paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 20 : StatusBar.currentHeight || 0),
+      paddingBottom: insets.bottom,
+      paddingLeft: Math.max(insets.left, responsiveStyles.spacing.small),
+      paddingRight: Math.max(insets.right, responsiveStyles.spacing.small),
+    }]}>
       {/* 美しい動的背景 */}
       <LinearGradient
         colors={['#FF69B4', '#FFB6C1', '#87CEEB', '#98FB98', '#DDA0DD', '#F0E68C']}
@@ -749,20 +815,27 @@ export default function NBackGame() {
         ))}
       </View>
       <View style={styles.mainContent}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>🌟 メモリークエスト 🌟</Text>
-          <View style={styles.decorativeStars}>
-            <Text style={styles.decorativeStar}>⭐</Text>
-            <Text style={styles.decorativeStar}>💫</Text>
-            <Text style={styles.decorativeStar}>🌟</Text>
+        {gameState.gamePhase === 'setup' && (
+          <View style={[styles.titleContainer, { 
+            marginBottom: responsiveStyles.spacing.medium,
+            paddingHorizontal: responsiveStyles.spacing.small 
+          }]}>
+            <Text style={[styles.title, { fontSize: responsiveStyles.fontSize.title }]}>🌟{"\n"}メモリークエスト{"\n"}🌟</Text>
+            <View style={styles.decorativeStars}>
+              <Text style={styles.decorativeStar}>⭐</Text>
+              <Text style={styles.decorativeStar}>💫</Text>
+              <Text style={styles.decorativeStar}>🌟</Text>
+            </View>
           </View>
-        </View>
+        )}
       
       {gameState.gamePhase === 'setup' && (
         <View style={styles.setupContainer}>
-          <Text style={styles.setupText}>🎮 レベルを選んでね！ 🎮</Text>
+          <Text style={[styles.setupText, { fontSize: responsiveStyles.fontSize.subtitle }]}>🎮 レベルをえらんでね！ 🎮</Text>
           
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="遊び方を確認"
             style={styles.rulesButton}
             onPress={() => setGameState(prev => ({ ...prev, gamePhase: 'rules' }))}
           >
@@ -778,6 +851,8 @@ export default function NBackGame() {
             {[1, 2, 3].map(level => (
               <Pressable
                 key={level}
+                accessibilityRole="button"
+                accessibilityLabel={`レベル${level}を開始`}
                 style={[styles.levelButton, { backgroundColor: COLORS[level - 1] }]}
                 onPress={() => startGame(level)}
               >
@@ -800,11 +875,11 @@ export default function NBackGame() {
           
           {/* ホームへ戻るボタン */}
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="ホーム画面に戻る"
             style={styles.homeButtonSetup}
             onPress={() => {
-              // ホーム画面に戻る（ルーターナビゲーションが必要）
-              console.log('ホーム画面への遷移');
-              // TODO: React Navigationまたはホーム画面へのナビゲーション
+              router.push('/');
             }}
           >
             <LinearGradient
@@ -855,6 +930,8 @@ export default function NBackGame() {
           </View>
           
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="レベル選択画面に戻る"
             style={styles.backButton}
             onPress={() => setGameState(prev => ({ ...prev, gamePhase: 'setup' }))}
           >
@@ -875,9 +952,15 @@ export default function NBackGame() {
             <Text style={styles.levelText}>レベル: {gameState.nLevel}</Text>
           </View>
           
-          {/* フェーズメッセージを固定高さにして、グリッドの位置を安定させる */}
-          <View style={styles.messageContainer}>
-            {gameState.isPreparationPhase && gameState.currentIndex < gameState.nLevel && (
+          {/* グリッドを中央に固定配置 */}
+          <View style={styles.gameContentContainer}>
+            <View style={[styles.grid, { width: gridSize, height: gridSize }]}>
+              {Array.from({ length: 9 }, (_, i) => renderTile(i))}
+            </View>
+            
+            {/* メッセージを絶対位置で表示 */}
+            <View style={styles.messageOverlay}>
+              {gameState.isPreparationPhase && gameState.currentIndex < gameState.nLevel && (
               <View style={styles.preparationContainer}>
                 <Text style={styles.preparationText}>
                   👀 よくみよう 👀
@@ -901,14 +984,13 @@ export default function NBackGame() {
                 </Text>
               </View>
             )}
-          </View>
-          
-          <View style={[styles.grid, { width: gridSize, height: gridSize }]}>
-            {Array.from({ length: 9 }, (_, i) => renderTile(i))}
+            </View>
           </View>
           
           {/* 子供向けの大きなボタンをグリッド直下に配置 */}
-          <View style={styles.buttonsContainer}>
+          <View style={[styles.buttonsContainer, { 
+            paddingBottom: Math.max(insets.bottom + 15, 30) 
+          }]}>
             <Animated.View
               style={{
                 transform: [{
@@ -920,6 +1002,8 @@ export default function NBackGame() {
               }}
             >
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="色ボタン - 色が同じときに押してください"
                 style={[
                   styles.gameButton,
                   styles.colorButton,
@@ -943,6 +1027,10 @@ export default function NBackGame() {
                 >
                   <Text style={[
                     styles.buttonText,
+                    { 
+                      fontSize: screenData.isSmallDevice ? 12 : 15,
+                      lineHeight: screenData.isSmallDevice ? 14 : 18 
+                    },
                     gameState.colorButtonPressed && styles.selectedButtonText
                   ]}>
                     {gameState.colorButtonPressed ? '✨ いろ えらんだ ✨' : '🎨 いろ 🎨'}
@@ -962,6 +1050,8 @@ export default function NBackGame() {
               }}
             >
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="場所ボタン - 場所が同じときに押してください"
                 style={[
                   styles.gameButton,
                   styles.positionButton,
@@ -985,6 +1075,10 @@ export default function NBackGame() {
                 >
                   <Text style={[
                     styles.buttonText,
+                    { 
+                      fontSize: screenData.isSmallDevice ? 12 : 15,
+                      lineHeight: screenData.isSmallDevice ? 14 : 18 
+                    },
                     gameState.positionButtonPressed && styles.selectedButtonText
                   ]}>
                     {gameState.positionButtonPressed ? '✨ ばしょ えらんだ ✨' : '📍 ばしょ 📍'}
@@ -1111,20 +1205,25 @@ export default function NBackGame() {
           
           <View style={styles.resultScoreContainer}>
             <Text style={styles.resultScore}>
-              🌟 さいしゅうてんすう: {gameState.score}/{gameState.totalTrials} 🌟
+              🌟 さいしゅうてんすう 🌟{"\n"}{gameState.score}/{gameState.totalTrials}
             </Text>
             <Text style={styles.resultPercentage}>
-              💫 せいかいりつ: {Math.round((gameState.score / Math.max(gameState.totalTrials, 1)) * 100)}% 💫
+              💫 せいかいりつ 💫{"\n"}{Math.round((gameState.score / Math.max(gameState.totalTrials, 1)) * 100)}%
             </Text>
             {gameState.score / Math.max(gameState.totalTrials, 1) >= 0.8 && (
-              <Text style={styles.excellentMessage}>🏆 すごい！おぼえるのがじょうずだね！ 🏆</Text>
+              <Text style={styles.excellentMessage}>🏆 すごい！{"\n"}おぼえるのがじょうずだね！ 🏆</Text>
             )}
           </View>
           
           <View style={styles.resultButtonsContainer}>
             {/* もういちど */}
             <Pressable
-              style={styles.resultButtonWide}
+              accessibilityRole="button"
+              accessibilityLabel="もう一度このレベルでゲームを始める"
+              style={[styles.resultButtonWide, { 
+                minHeight: responsiveStyles.buttonHeight,
+                marginBottom: responsiveStyles.spacing.small,
+              }]}
               onPress={() => {
                 // 終了時の祝福アニメーション開始
                 Animated.parallel([
@@ -1173,13 +1272,18 @@ export default function NBackGame() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                <Text style={styles.resultButtonText}>🎮 もういちど 🎮</Text>
+                <Text style={[styles.resultButtonText, { fontSize: responsiveStyles.fontSize.button }]}>🎮 もういちど 🎮</Text>
               </LinearGradient>
             </Pressable>
             
             {/* レベルをえらびなおす */}
             <Pressable
-              style={styles.resultButtonWide}
+              accessibilityRole="button"
+              accessibilityLabel="レベル選択画面に戻る"
+              style={[styles.resultButtonWide, { 
+                minHeight: responsiveStyles.buttonHeight,
+                marginBottom: responsiveStyles.spacing.small,
+              }]}
               onPress={() => {
                 setGameState(prev => ({
                   ...prev,
@@ -1204,17 +1308,20 @@ export default function NBackGame() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                <Text style={styles.resultButtonText}>🔄 レベルをえらびなおす 🔄</Text>
+                <Text style={[styles.resultButtonText, { fontSize: responsiveStyles.fontSize.button }]}>🔄 レベルをえらびなおす 🔄</Text>
               </LinearGradient>
             </Pressable>
             
             {/* ホームにもどる */}
             <Pressable
-              style={styles.resultButtonWide}
+              accessibilityRole="button"
+              accessibilityLabel="ホーム画面に戻る"
+              style={[styles.resultButtonWide, { 
+                minHeight: responsiveStyles.buttonHeight,
+                marginBottom: responsiveStyles.spacing.small,
+              }]}
               onPress={() => {
-                // ホーム画面に戻る（ルーターナビゲーションが必要）
-                console.log('ホーム画面への遷移');
-                // TODO: React Navigationまたはホーム画面へのナビゲーション
+                router.push('/');
               }}
             >
               <LinearGradient
@@ -1223,7 +1330,7 @@ export default function NBackGame() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                <Text style={styles.resultButtonText}>🏠 ホームにもどる 🏠</Text>
+                <Text style={[styles.resultButtonText, { fontSize: responsiveStyles.fontSize.button }]}>🏠 ホームにもどる 🏠</Text>
               </LinearGradient>
             </Pressable>
           </View>
@@ -1270,10 +1377,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    fontSize: 32,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#FF1493',
     marginBottom: 10,
+    textAlign: 'center',
+    lineHeight: 32,
     textShadowColor: '#FFD700',
     textShadowOffset: { width: 2, height: 2 },
     textShadowRadius: 3,
@@ -1293,9 +1402,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   setupText: {
-    fontSize: 22,
+    fontSize: 20,
     color: '#FF1493',
-    marginBottom: 30,
+    marginBottom: 20,
     textAlign: 'center',
     fontWeight: 'bold',
     textShadowColor: '#FFD700',
@@ -1303,30 +1412,36 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   levelButtons: {
-    flexDirection: 'row',
-    gap: 20,
+    flexDirection: 'column',
+    gap: 12,
+    width: '100%',
+    paddingHorizontal: 20,
   },
   levelButton: {
-    paddingHorizontal: 25,
-    paddingVertical: 20,
-    borderRadius: 20,
-    elevation: 8,
+    width: '100%',
+    maxWidth: 280,
+    alignSelf: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 15,
+    elevation: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
-    shadowRadius: 6,
+    shadowRadius: 4,
     marginHorizontal: 10,
   },
   levelButtonGradient: {
-    paddingHorizontal: 25,
-    paddingVertical: 20,
-    borderRadius: 20,
+    width: '100%',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
   levelButtonText: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     textShadowColor: '#000',
     textShadowOffset: { width: 1, height: 1 },
@@ -1335,6 +1450,7 @@ const styles = StyleSheet.create({
   gameContainer: {
     flex: 1,
     alignItems: 'center',
+    paddingBottom: 100,
   },
   scoreContainer: {
     flexDirection: 'row',
@@ -1358,11 +1474,19 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
-  messageContainer: {
-    minHeight: 80,
+  gameContentContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    position: 'relative',
+  },
+  messageOverlay: {
+    position: 'absolute',
+    top: -100,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    alignItems: 'center',
   },
   preparationContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -1423,7 +1547,6 @@ const styles = StyleSheet.create({
   },
   grid: {
     position: 'relative',
-    marginBottom: 30,
   },
   tile: {
     position: 'absolute',
@@ -1460,25 +1583,37 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonsContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    gap: 20,
-    marginBottom: 20,
+    gap: 15,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
   },
   gameButton: {
-    paddingHorizontal: 35,
-    paddingVertical: 20,
+    flex: 1,
+    height: 60,
+    minHeight: 44,
+    maxWidth: 140,
     borderRadius: 30,
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
-    marginHorizontal: 10,
+    marginHorizontal: 5,
+    overflow: 'hidden',
   },
   buttonGradient: {
-    paddingHorizontal: 35,
-    paddingVertical: 20,
-    borderRadius: 30,
+    flex: 1,
+    height: '100%',
+    paddingHorizontal: 15,
+    paddingVertical: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1491,14 +1626,31 @@ const styles = StyleSheet.create({
   gameButtonPressed: {
     transform: [{ scale: 0.95 }],
     elevation: 4,
+    shadowOpacity: 0.6,
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-    textShadowColor: '#000',
+    fontSize: 16,
+    fontWeight: '900',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 4,
+    letterSpacing: 0.5,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  selectedButtonText: {
+    color: '#000000',
+    fontSize: 16,
+    fontWeight: '900',
+    textAlign: 'center',
+    textShadowColor: 'rgba(255,255,255,0.9)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+    letterSpacing: 0.5,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   feedbackContainer: {
     position: 'absolute',
@@ -1563,46 +1715,47 @@ const styles = StyleSheet.create({
     color: '#FFD700',
   },
   excellentMessage: {
-    fontSize: 20,
+    fontSize: 18,
     color: '#FF69B4',
     fontWeight: 'bold',
     textAlign: 'center',
+    lineHeight: 24,
     marginTop: 15,
     textShadowColor: '#FFD700',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
   rulesButton: {
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 25,
-    elevation: 6,
+    paddingHorizontal: 25,
+    paddingVertical: 12,
+    borderRadius: 20,
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
-    shadowRadius: 5,
-    marginBottom: 25,
+    shadowRadius: 4,
+    marginBottom: 20,
   },
   rulesButtonGradient: {
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 25,
+    paddingHorizontal: 25,
+    paddingVertical: 12,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rulesButtonText: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     textShadowColor: '#000',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
   levelDescription: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#FFFFFF',
     textAlign: 'center',
-    marginTop: 5,
+    marginTop: 3,
     opacity: 0.9,
   },
   rulesContainer: {
@@ -1677,8 +1830,13 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   selectedButtonGradient: {
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: '#FFD700',
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    elevation: 12,
   },
   selectedButtonText: {
     fontSize: 18,
@@ -1708,6 +1866,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
+    // プロフェッショナルな動的スタイル
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
   },
   resultButtonGradient: {
     paddingHorizontal: 20,
@@ -1798,18 +1959,22 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   resultScore: {
-    fontSize: 26,
+    fontSize: 22,
     color: '#FF1493',
     fontWeight: 'bold',
     marginBottom: 15,
+    textAlign: 'center',
+    lineHeight: 28,
     textShadowColor: '#FFD700',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
   resultPercentage: {
-    fontSize: 22,
+    fontSize: 20,
     color: '#00CED1',
     fontWeight: 'bold',
+    textAlign: 'center',
+    lineHeight: 26,
     textShadowColor: '#FFD700',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
