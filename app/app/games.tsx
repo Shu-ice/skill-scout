@@ -30,9 +30,9 @@ export default function Games() {
         
         <Pressable 
           style={styles.gameItem}
-          onPress={() => router.push('/games/cardsort')}
+          onPress={() => router.push('/games/stroop')}
         >
-          <Text style={styles.gameText}>🎴 カード仕分け（抑制制御）</Text>
+          <Text style={styles.gameText}>🧩 にじいろコトバ（抑制制御）</Text>
         </Pressable>
         
         <Pressable style={[styles.gameItem, styles.disabledItem]}>
