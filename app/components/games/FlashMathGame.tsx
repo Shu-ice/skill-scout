@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, Animated, Platform, Dimensions, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, Animated, Platform, Dimensions, StatusBar, ScrollView, KeyboardAvoidingView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
@@ -8,7 +8,7 @@ interface GameSettings {
   digits: number;
   speed: number;
   count: number;
-  mode: 'add' | 'subtract' | 'mixed';
+  mode: 'add' | 'mixed';
 }
 
 interface GameRecord {
@@ -34,7 +34,7 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
   const [gamePhase, setGamePhase] = useState<'welcome' | 'setup' | 'countdown' | 'playing' | 'input' | 'result'>('welcome');
   const [settings, setSettings] = useState<GameSettings>({
     digits: 2,
-    speed: 1.0,
+    speed: 0.5,
     count: 10,
     mode: 'add'
   });
@@ -52,9 +52,7 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
   
-  // 設定
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [effectsEnabled, setEffectsEnabled] = useState(true);
+  // 設定は削除
   
   // アニメーション
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -87,30 +85,11 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
     }
   };
 
+  // 設定読み込みを簡略化
   const loadSettings = async () => {
-    try {
-      const settingsStr = await AsyncStorage.getItem('flashMathSettings');
-      if (settingsStr) {
-        const savedSettings = JSON.parse(settingsStr);
-        setSoundEnabled(savedSettings.soundEnabled ?? true);
-        setEffectsEnabled(savedSettings.effectsEnabled ?? true);
-      }
-    } catch {
-      console.log('設定の読み込みに失敗しました');
-    }
+    // 特に保存する設定なし
   };
 
-  const saveSettings = useCallback(async () => {
-    try {
-      const settingsToSave = {
-        soundEnabled,
-        effectsEnabled,
-      };
-      await AsyncStorage.setItem('flashMathSettings', JSON.stringify(settingsToSave));
-    } catch {
-      console.log('設定の保存に失敗しました');
-    }
-  }, [soundEnabled, effectsEnabled]);
 
   const saveRecord = useCallback(async (record: GameRecord) => {
     try {
@@ -124,7 +103,7 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
 
   // 効果音の再生（ハプティック）
   const playSound = useCallback((type: 'correct' | 'incorrect' | 'countdown' | 'start') => {
-    if (!soundEnabled || Platform.OS === 'web') return;
+    if (Platform.OS === 'web') return;
     
     try {
       switch (type) {
@@ -142,7 +121,7 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
     } catch {
       console.log('ハプティックフィードバックエラー');
     }
-  }, [soundEnabled]);
+  }, []);
 
   // 数字生成関数
   const generateNumbers = useCallback(() => {
@@ -153,38 +132,28 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
     const nums: number[] = [];
     const ops: string[] = [];
     
-    // 最初の数字
+    // 最初の数字（足し算カードとして扱う）
     const firstNum = Math.floor(Math.random() * (max - min + 1)) + min;
     nums.push(firstNum);
     let answer = firstNum;
-    ops.push(''); // 最初は演算子なし
+    ops.push('+'); // 最初も「+」として表示
     
-    // 残りの数字を生成
+    // 残りの数字を生成（正確に count - 1 個）
     for (let i = 1; i < count; i++) {
-      const num = Math.floor(Math.random() * (max - min + 1)) + min;
+      let num = Math.floor(Math.random() * (max - min + 1)) + min;
       let operation: string;
       
       if (mode === 'add') {
         operation = '+';
-      } else if (mode === 'subtract') {
-        operation = '-';
       } else {
-        operation = Math.random() < 0.5 ? '+' : '-';
+        // 混合モード：加算と減算をランダムに
+        operation = Math.random() < 0.7 ? '+' : '-'; // 加算をやや多めに
       }
       
       // 負の数にならないように調整
-      if (operation === '-' && answer - num < 0) {
-        if (mode === 'mixed') {
-          operation = '+'; // 混合モードでは加算に変更
-        } else {
-          // 減算モードの場合は、より小さい数に変更
-          const maxSubtract = answer;
-          const newNum = Math.floor(Math.random() * Math.min(maxSubtract, max - min + 1)) + 1;
-          nums.push(newNum);
-          ops.push(operation);
-          answer -= newNum;
-          continue;
-        }
+      if (operation === '-' && answer - num <= 0) {
+        // 結果が0以下になる場合は加算に変更
+        operation = '+';
       }
       
       ops.push(operation);
@@ -201,9 +170,10 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
     setOperations(ops);
     setCorrectAnswer(answer);
     
-    console.log('生成された数字:', nums);
-    console.log('演算子:', ops);
+    console.log(`生成された数字 (${nums.length}個):`, nums);
+    console.log(`演算子 (${ops.length}個):`, ops);
     console.log('正解:', answer);
+    console.log(`設定数: ${count}個`);
   }, [settings]);
 
   // カウントダウン開始
@@ -242,13 +212,13 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
             setTimeout(() => {
               Animated.timing(countdownAnim, {
                 toValue: 0,
-                duration: 300,
+                duration: 200,
                 useNativeDriver: true,
               }).start(() => {
                 setGamePhase('playing');
                 setCurrentIndex(0);
               });
-            }, 800);
+            }, 400);
           });
         }
       });
@@ -257,56 +227,6 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
     countdown(3);
   }, [countdownAnim, playSound]);
 
-  // 数字を順次表示
-  const showNextNumber = useCallback(() => {
-    if (currentIndex >= numbers.length) {
-      // 全ての数字表示完了
-      setGamePhase('input');
-      return;
-    }
-
-    console.log(`数字表示: ${currentIndex + 1}/${numbers.length} - ${numbers[currentIndex]} ${operations[currentIndex]}`);
-
-    // プログレスバー更新
-    Animated.timing(progressAnim, {
-      toValue: (currentIndex + 1) / numbers.length,
-      duration: 200,
-      useNativeDriver: false,
-    }).start();
-
-    // 数字のフェードイン
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.sequence([
-        Animated.timing(scaleAnim, {
-          toValue: 1.3,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start();
-
-    // 指定時間後にフェードアウト
-    gameTimer.current = setTimeout(() => {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => {
-        setCurrentIndex(prev => prev + 1);
-        // 次の数字表示のために少し間隔を空ける
-      });
-    }, settings.speed * 1000);
-  }, [currentIndex, numbers, operations, settings.speed, fadeAnim, progressAnim, scaleAnim]);
 
   // ゲーム開始
   const startGame = useCallback(() => {
@@ -323,6 +243,7 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
     progressAnim.setValue(0);
     
     // ゲーム状態をリセット
+    console.log('ゲーム開始 - currentIndexをリセット');
     setCurrentIndex(0);
     setUserAnswer('');
     setIsCorrect(false);
@@ -420,37 +341,130 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
     };
   }, []);
 
-  // 設定保存
-  useEffect(() => {
-    saveSettings();
-  }, [soundEnabled, effectsEnabled, saveSettings]);
 
   // ゲームフェーズが'playing'になったら数字表示開始
   useEffect(() => {
     if (gamePhase === 'playing' && currentIndex === 0 && numbers.length > 0) {
       const timer = setTimeout(() => {
-        showNextNumber();
+        console.log(`初回数字表示開始: ${numbers[0]}`);
+        // 初回の数字表示を直接実行
+        if (numbers.length > 0 && currentIndex === 0) {
+          const currentNum = numbers[0] || 0;
+          const currentOp = operations[0] || '';
+          console.log(`数字表示: 1/${numbers.length} - ${currentNum} ${currentOp}`);
+          
+          // プログレスバー更新
+          Animated.timing(progressAnim, {
+            toValue: 1 / numbers.length,
+            duration: 200,
+            useNativeDriver: false,
+          }).start();
+          
+          // 数字のフェードイン
+          Animated.parallel([
+            Animated.timing(fadeAnim, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+            Animated.sequence([
+              Animated.timing(scaleAnim, {
+                toValue: 1.3,
+                duration: 200,
+                useNativeDriver: true,
+              }),
+              Animated.timing(scaleAnim, {
+                toValue: 1,
+                duration: 200,
+                useNativeDriver: true,
+              }),
+            ]),
+          ]).start();
+          
+          // 指定時間後にフェードアウト
+          gameTimer.current = setTimeout(() => {
+            Animated.timing(fadeAnim, {
+              toValue: 0,
+              duration: 300,
+              useNativeDriver: true,
+            }).start(() => {
+              setCurrentIndex(1);
+            });
+          }, settings.speed * 1000);
+        }
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [gamePhase, currentIndex, numbers.length, showNextNumber]);
+  }, [gamePhase]);
 
-  // currentIndexが変更されたら次の数字を表示
+  // currentIndexが変更されたら次の処理
   useEffect(() => {
-    if (gamePhase === 'playing' && currentIndex > 0 && currentIndex < numbers.length) {
-      const timer = setTimeout(() => {
-        showNextNumber();
-      }, 200);
-      return () => clearTimeout(timer);
+    if (gamePhase === 'playing' && currentIndex > 0) {
+      if (currentIndex < numbers.length) {
+        const timer = setTimeout(() => {
+          console.log(`次の数字表示: ${currentIndex + 1}/${numbers.length}`);
+          // 直接showNextNumberを呼び出す代わりにロジックをここに移動
+          if (currentIndex < numbers.length) {
+            const currentNum = numbers[currentIndex] || 0;
+            const currentOp = operations[currentIndex] || '';
+            console.log(`数字表示: ${currentIndex + 1}/${numbers.length} - ${currentNum} ${currentOp}`);
+            
+            // プログレスバー更新
+            Animated.timing(progressAnim, {
+              toValue: (currentIndex + 1) / numbers.length,
+              duration: 200,
+              useNativeDriver: false,
+            }).start();
+            
+            // 数字のフェードイン
+            Animated.parallel([
+              Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true,
+              }),
+              Animated.sequence([
+                Animated.timing(scaleAnim, {
+                  toValue: 1.3,
+                  duration: 200,
+                  useNativeDriver: true,
+                }),
+                Animated.timing(scaleAnim, {
+                  toValue: 1,
+                  duration: 200,
+                  useNativeDriver: true,
+                }),
+              ]),
+            ]).start();
+            
+            // 指定時間後にフェードアウト
+            gameTimer.current = setTimeout(() => {
+              Animated.timing(fadeAnim, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+              }).start(() => {
+                const nextIndex = currentIndex + 1;
+                setCurrentIndex(nextIndex);
+              });
+            }, settings.speed * 1000);
+          }
+        }, 200);
+        return () => clearTimeout(timer);
+      } else {
+        // 全ての数字表示完了
+        console.log('全ての数字表示完了 - 入力フェーズへ');
+        setGamePhase('input');
+      }
     }
-  }, [gamePhase, currentIndex, numbers.length, showNextNumber]);
+  }, [currentIndex, gamePhase, numbers.length, numbers, operations, settings.speed, progressAnim, fadeAnim, scaleAnim]);
 
   // 正解時の紙吹雪エフェクト表示
   useEffect(() => {
-    if (gamePhase === 'result' && isCorrect && effectsEnabled) {
+    if (gamePhase === 'result' && isCorrect) {
       playConfettiAnimation();
     }
-  }, [gamePhase, isCorrect, effectsEnabled, playConfettiAnimation]);
+  }, [gamePhase, isCorrect, playConfettiAnimation]);
 
   // タブコンテンツのレンダリング
   const renderTabContent = () => {
@@ -477,7 +491,7 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
                     </Text>
                   </View>
                   <Text style={styles.recordDetails}>
-                    {record.digits}けた × {record.count}もん ({record.speed}びょう) - {record.mode === 'add' ? 'たし' : record.mode === 'subtract' ? 'ひき' : 'まぜ'}ざん
+                    {record.digits}けた × {record.count}もん ({record.speed}びょう) - {record.mode === 'add' ? 'たしざん' : 'たし・ひきざん'}
                   </Text>
                 </View>
               ))}
@@ -574,7 +588,11 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
 
     if (gamePhase === 'setup') {
       return (
-        <View style={styles.setupContainer}>
+        <ScrollView 
+          style={styles.setupScrollView}
+          contentContainerStyle={styles.setupContainer}
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={styles.gameTitle}>🌸 ゲームせってい 🌸</Text>
           <Text style={styles.gameSubtitle}>あなたのすきなむずかしさをえらんでね！</Text>
           
@@ -608,7 +626,26 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
             <View style={styles.settingGroup}>
               <Text style={styles.settingTitle}>⚡ はやさ: {settings.speed}びょう</Text>
               <View style={styles.settingButtons}>
-                {[0.5, 0.8, 1.0, 1.5].map(speed => (
+                {[0.1, 0.2, 0.3, 0.5].map(speed => (
+                  <Pressable
+                    key={speed}
+                    style={[
+                      styles.settingButton,
+                      { backgroundColor: settings.speed === speed ? '#2196F3' : '#E0E0E0' }
+                    ]}
+                    onPress={() => setSettings(prev => ({ ...prev, speed }))}
+                  >
+                    <Text style={[
+                      styles.settingButtonText,
+                      { color: settings.speed === speed ? 'white' : '#333' }
+                    ]}>
+                      {speed}s
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View style={styles.settingButtons}>
+                {[0.8, 1.0, 1.5].map(speed => (
                   <Pressable
                     key={speed}
                     style={[
@@ -658,8 +695,7 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
               <View style={styles.modeButtons}>
                 {[
                   { key: 'add', label: '➕ たしざん', color: '#4CAF50' },
-                  { key: 'subtract', label: '➖ ひきざん', color: '#FF6B35' },
-                  { key: 'mixed', label: '🎲 まぜる', color: '#9C27B0' }
+                  { key: 'mixed', label: '🎲 たし・ひき', color: '#9C27B0' }
                 ].map(mode => (
                   <Pressable
                     key={mode.key}
@@ -684,28 +720,6 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
               </View>
             </View>
 
-            {/* エフェクト設定 */}
-            <View style={styles.settingGroup}>
-              <Text style={styles.settingTitle}>🎨 エフェクト</Text>
-              <View style={styles.toggleRow}>
-                <Pressable
-                  style={[styles.toggleButton, { backgroundColor: soundEnabled ? '#4CAF50' : '#E0E0E0' }]}
-                  onPress={() => setSoundEnabled(!soundEnabled)}
-                >
-                  <Text style={[styles.toggleText, { color: soundEnabled ? 'white' : '#666' }]}>
-                    🔊 おと
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.toggleButton, { backgroundColor: effectsEnabled ? '#4CAF50' : '#E0E0E0' }]}
-                  onPress={() => setEffectsEnabled(!effectsEnabled)}
-                >
-                  <Text style={[styles.toggleText, { color: effectsEnabled ? 'white' : '#666' }]}>
-                    ✨ しかけ
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
           </View>
 
           {/* スタートボタン */}
@@ -719,7 +733,7 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
               <Text style={styles.startButtonText}>🚀 ゲームスタート！ 🚀</Text>
             </LinearGradient>
           </Pressable>
-        </View>
+        </ScrollView>
       );
     }
 
@@ -745,7 +759,7 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
               style={styles.countdownGradient}
             >
               <Text style={styles.countdownText}>
-                {countdownValue > 0 ? countdownValue : 'スタート！'}
+                {countdownValue > 0 ? countdownValue : 'スタート!'}
               </Text>
             </LinearGradient>
           </Animated.View>
@@ -801,7 +815,7 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
               }
               style={styles.numberGradient}
             >
-              {currentIndex > 0 && currentOperation && (
+              {currentOperation && (
                 <Text style={styles.operationDisplay}>{currentOperation}</Text>
               )}
               <Text style={styles.numberDisplay}>{currentNumber}</Text>
@@ -818,7 +832,11 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
 
     if (gamePhase === 'input') {
       return (
-        <View style={styles.inputContainer}>
+        <KeyboardAvoidingView 
+          style={styles.inputContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+        >
           <Text style={styles.inputTitle}>📝 こたえをにゅうりょくしてね！</Text>
           <Text style={styles.inputSubTitle}>すべてのすうじをたしたり、ひいたりしたこたえは？</Text>
           
@@ -831,27 +849,25 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
               keyboardType="numeric"
               autoFocus
               placeholderTextColor="#999"
+              onSubmitEditing={checkAnswer}
+              returnKeyType="done"
             />
           </View>
           
           <Pressable 
-            style={[styles.submitButton, { opacity: userAnswer ? 1 : 0.5 }]}
+            style={styles.submitButton}
             onPress={checkAnswer}
-            disabled={!userAnswer}
           >
             <LinearGradient
-              colors={userAnswer ? ['#2196F3', '#1976D2'] : ['#E0E0E0', '#BDBDBD']}
+              colors={['#2196F3', '#1976D2']}
               style={styles.submitButtonGradient}
             >
-              <Text style={[
-                styles.submitButtonText,
-                { color: userAnswer ? 'white' : '#666' }
-              ]}>
+              <Text style={styles.submitButtonText}>
                 ✅ かくにん
               </Text>
             </LinearGradient>
           </Pressable>
-        </View>
+        </KeyboardAvoidingView>
       );
     }
 
@@ -859,7 +875,7 @@ export default function FlashMathGame({ onGameEnd }: FlashMathGameProps) {
       return (
         <View style={styles.resultContainer}>
           {/* 紙吹雪エフェクト */}
-          {effectsEnabled && isCorrect && (
+          {isCorrect && (
             <Animated.View
               style={[
                 styles.confettiContainer,
@@ -1025,36 +1041,35 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: 'row',
-    paddingTop: Platform.OS === 'ios' ? Math.max(screenWidth / 8, 60) : StatusBar.currentHeight ? StatusBar.currentHeight + Math.max(screenWidth / 20, 20) : Math.max(screenWidth / 10, 50),
-    paddingBottom: Math.max(screenWidth / 30, 12),
-    paddingHorizontal: Math.max(screenWidth / 25, 15),
+    paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight ? StatusBar.currentHeight + 15 : 40,
+    paddingBottom: 8,
+    paddingHorizontal: 10,
     justifyContent: 'space-around',
     zIndex: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   tab: {
-    paddingHorizontal: Math.max(screenWidth / 30, 12),
-    paddingVertical: Math.max(screenWidth / 40, 8),
-    borderRadius: Math.max(screenWidth / 25, 16),
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 15,
     alignItems: 'center',
-    minWidth: Math.max(screenWidth / 6, 70),
-    minHeight: Math.max(screenWidth / 12, 44),
-    marginHorizontal: Math.max(screenWidth / 80, 3),
+    minWidth: 70,
+    marginHorizontal: 3,
     justifyContent: 'center',
   },
   tabIcon: {
-    fontSize: Math.min(screenWidth / 18, 22),
-    marginBottom: Math.max(screenWidth / 100, 2),
+    fontSize: 18,
+    marginBottom: 2,
   },
   tabText: {
-    fontSize: Math.min(screenWidth / 30, 14),
+    fontSize: 12,
     fontWeight: 'bold',
   },
   content: {
     flex: 1,
-    paddingHorizontal: Math.max(screenWidth / 25, 15),
-    paddingTop: Math.max(screenWidth / 50, 8),
-    paddingBottom: Math.max(screenWidth / 25, 15),
+    paddingHorizontal: 15,
+    paddingTop: 5,
+    paddingBottom: 15,
     zIndex: 2,
   },
   gameContent: {
@@ -1069,108 +1084,112 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: Math.max(screenWidth / 15, 20),
+    paddingHorizontal: 20,
   },
   welcomeTitle: {
-    fontSize: Math.min(screenWidth / 8, 40),
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#FF1493',
-    marginBottom: Math.max(screenWidth / 25, 20),
+    marginBottom: 15,
     textAlign: 'center',
     textShadowColor: '#FFD700',
     textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    textShadowRadius: 3,
   },
   welcomeSubtitle: {
-    fontSize: Math.min(screenWidth / 12, 24),
+    fontSize: 18,
     color: '#555',
-    marginBottom: Math.max(screenWidth / 20, 25),
+    marginBottom: 20,
     textAlign: 'center',
     fontWeight: '600',
   },
   welcomeDescription: {
-    fontSize: Math.min(screenWidth / 16, 18),
+    fontSize: 16,
     color: '#555',
     textAlign: 'center',
-    lineHeight: Math.min(screenWidth / 12, 28),
-    marginBottom: Math.max(screenWidth / 10, 40),
-    paddingHorizontal: Math.max(screenWidth / 20, 15),
+    lineHeight: 24,
+    marginBottom: 30,
+    paddingHorizontal: 15,
   },
   welcomeStartButton: {
-    borderRadius: Math.max(screenWidth / 12, 30),
+    borderRadius: 30,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 15,
-    elevation: 15,
-    marginTop: Math.max(screenWidth / 20, 20),
-    width: '90%',
-    maxWidth: Math.min(screenWidth * 0.8, 350),
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
+    marginTop: 20,
+    width: '85%',
+    maxWidth: 320,
   },
   welcomeStartButtonGradient: {
-    paddingHorizontal: Math.max(screenWidth / 8, 40),
-    paddingVertical: Math.max(screenWidth / 20, 18),
-    minHeight: Math.max(screenWidth / 7, 65),
+    paddingHorizontal: 40,
+    paddingVertical: 18,
+    minHeight: 56,
     alignItems: 'center',
     justifyContent: 'center',
   },
   welcomeStartButtonText: {
     color: 'white',
-    fontSize: Math.min(screenWidth / 10, 28),
+    fontSize: 22,
     fontWeight: 'bold',
-    textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 3,
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
     textAlign: 'center',
   },
   
   // Setup画面
-  setupContainer: {
+  setupScrollView: {
     flex: 1,
+  },
+  setupContainer: {
+    flexGrow: 1,
     justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingTop: Math.max(screenWidth / 30, 15),
-    paddingHorizontal: Math.max(screenWidth / 20, 15),
+    paddingTop: 8,
+    paddingHorizontal: 15,
+    paddingBottom: 20,
   },
   gameTitle: {
-    fontSize: Math.min(screenWidth / 10, 32),
+    fontSize: screenWidth < 400 ? 20 : 24,
     fontWeight: 'bold',
     color: '#FF1493',
-    marginBottom: Math.max(screenWidth / 40, 12),
+    marginBottom: 10,
     textAlign: 'center',
     textShadowColor: '#FFB6C1',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 3,
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   gameSubtitle: {
-    fontSize: Math.min(screenWidth / 16, 18),
+    fontSize: 15,
     color: '#555',
-    marginBottom: Math.max(screenWidth / 30, 20),
+    marginBottom: 12,
     textAlign: 'center',
     fontWeight: '600',
-    lineHeight: Math.min(screenWidth / 12, 24),
+    lineHeight: 18,
   },
   settingsPanel: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: Math.max(screenWidth / 20, 20),
-    padding: Math.max(screenWidth / 20, 20),
+    borderRadius: 18,
+    padding: screenWidth < 400 ? 12 : 15,
     width: '100%',
-    maxWidth: Math.min(screenWidth * 0.95, 500),
-    marginBottom: Math.max(screenWidth / 25, 20),
+    maxWidth: screenWidth < 400 ? screenWidth - 30 : 380,
+    marginBottom: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 5,
   },
   settingGroup: {
-    marginBottom: Math.max(screenWidth / 15, 25),
+    marginBottom: 15,
   },
   settingTitle: {
-    fontSize: Math.min(screenWidth / 14, 22),
+    fontSize: screenWidth < 400 ? 15 : 17,
     fontWeight: 'bold',
-    marginBottom: Math.max(screenWidth / 25, 15),
+    marginBottom: 10,
     color: '#333',
     textAlign: 'center',
   },
@@ -1178,86 +1197,68 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     flexWrap: 'wrap',
-    gap: Math.max(screenWidth / 40, 8),
+    gap: 6,
   },
   settingButton: {
-    paddingHorizontal: Math.max(screenWidth / 30, 12),
-    paddingVertical: Math.max(screenWidth / 40, 10),
-    borderRadius: Math.max(screenWidth / 25, 16),
-    minWidth: Math.max(screenWidth / 8, 60),
-    minHeight: Math.max(screenWidth / 12, 44),
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 14,
+    minWidth: 50,
+    minHeight: 36,
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
-    marginHorizontal: Math.max(screenWidth / 80, 2),
+    marginHorizontal: 2,
   },
   settingButtonText: {
-    fontSize: Math.min(screenWidth / 20, 16),
+    fontSize: 13,
     fontWeight: 'bold',
   },
   modeButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'center',
     flexWrap: 'wrap',
-    gap: Math.max(screenWidth / 35, 10),
+    gap: 12,
   },
   modeButton: {
-    paddingHorizontal: Math.max(screenWidth / 25, 15),
-    paddingVertical: Math.max(screenWidth / 30, 12),
-    borderRadius: Math.max(screenWidth / 20, 20),
-    minWidth: Math.max(screenWidth / 5, 90),
-    minHeight: Math.max(screenWidth / 10, 48),
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 18,
+    minWidth: screenWidth < 400 ? 120 : 140,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modeButtonText: {
-    fontSize: Math.min(screenWidth / 18, 18),
-    fontWeight: 'bold',
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    gap: Math.max(screenWidth / 20, 15),
-  },
-  toggleButton: {
-    paddingHorizontal: Math.max(screenWidth / 20, 20),
-    paddingVertical: Math.max(screenWidth / 30, 12),
-    borderRadius: Math.max(screenWidth / 20, 20),
-    minHeight: Math.max(screenWidth / 10, 48),
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toggleText: {
-    fontSize: Math.min(screenWidth / 16, 20),
+    fontSize: screenWidth < 400 ? 14 : 16,
     fontWeight: 'bold',
   },
   startButton: {
-    borderRadius: Math.max(screenWidth / 15, 25),
+    borderRadius: 25,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 15,
-    elevation: 15,
-    marginTop: Math.max(screenWidth / 25, 15),
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
+    marginTop: 12,
     width: '100%',
-    maxWidth: Math.min(screenWidth * 0.9, 400),
+    maxWidth: 320,
   },
   startButtonGradient: {
-    paddingHorizontal: Math.max(screenWidth / 10, 40),
-    paddingVertical: Math.max(screenWidth / 20, 20),
-    minHeight: Math.max(screenWidth / 8, 60),
+    paddingHorizontal: 35,
+    paddingVertical: 16,
+    minHeight: 52,
     alignItems: 'center',
     justifyContent: 'center',
   },
   startButtonText: {
     color: 'white',
-    fontSize: Math.min(screenWidth / 12, 26),
+    fontSize: screenWidth < 400 ? 18 : 20,
     fontWeight: 'bold',
-    textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 3,
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
     textAlign: 'center',
   },
   
@@ -1268,9 +1269,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   countdownCircle: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: screenWidth < 400 ? 140 : 180,
+    height: screenWidth < 400 ? 140 : 180,
+    borderRadius: screenWidth < 400 ? 70 : 90,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
@@ -1285,12 +1286,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   countdownText: {
-    fontSize: 48,
+    fontSize: screenWidth < 400 ? 28 : 32,
     fontWeight: 'bold',
     color: 'white',
     textShadowColor: 'rgba(0,0,0,0.3)',
     textShadowOffset: { width: 2, height: 2 },
     textShadowRadius: 4,
+    textAlign: 'center',
+    lineHeight: screenWidth < 400 ? 30 : 34,
+    letterSpacing: 1,
   },
   countdownSubText: {
     fontSize: 24,
@@ -1378,6 +1382,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   inputTitle: {
     fontSize: 24,
@@ -1394,7 +1399,9 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   inputWrapper: {
-    marginBottom: 30,
+    marginBottom: 25,
+    width: '100%',
+    alignItems: 'center',
   },
   answerInput: {
     backgroundColor: 'white',
@@ -1403,10 +1410,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 25,
     paddingVertical: 20,
-    fontSize: 32,
+    fontSize: screenWidth < 400 ? 28 : 32,
     fontWeight: 'bold',
     textAlign: 'center',
-    minWidth: 200,
+    minWidth: screenWidth < 400 ? 180 : 200,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -1428,8 +1435,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   submitButtonText: {
-    fontSize: 20,
+    fontSize: screenWidth < 400 ? 18 : 20,
     fontWeight: 'bold',
+    color: 'white',
   },
   
   // 結果画面

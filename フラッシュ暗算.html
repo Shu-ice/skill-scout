@@ -1,0 +1,2121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>フラッシュ暗算 Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #0071e3;
+            --secondary-color: #5ac8fa;
+            --accent-color: #ff2d55;
+            --success-color: #34c759;
+            --warning-color: #ffcc00;
+            --error-color: #ff3b30;
+            --background-light: #f5f5f7;
+            --text-light: #1d1d1f;
+            --card-light: rgba(255, 255, 255, 0.8);
+            --background-dark: #1d1d1f;
+            --text-dark: #f5f5f7;
+            --card-dark: rgba(30, 30, 30, 0.8);
+        }
+        
+        @keyframes ripple-out {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0.8;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(100);
+                opacity: 0;
+            }
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+            transition: background-color 0.5s ease, color 0.5s ease;
+            overflow: hidden;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        body.light {
+            background-color: var(--background-light);
+            color: var(--text-light);
+            background-image: linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(230,230,235,0.8) 100%);
+            background-attachment: fixed;
+        }
+
+        body.dark {
+            background-color: var(--background-dark);
+            color: var(--text-dark);
+            background-image: linear-gradient(135deg, rgba(45,45,45,0.9) 0%, rgba(25,25,25,0.9) 100%);
+            background-attachment: fixed;
+        }
+
+        .app-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 1rem;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .glass-card {
+            border-radius: 20px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+
+        .light .glass-card {
+            background-color: var(--card-light);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+        }
+
+        .dark .glass-card {
+            background-color: var(--card-dark);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .neo-button {
+            position: relative;
+            padding: 0.9rem 2rem;
+            margin-bottom: 1.5rem;
+            font-size: 1.3rem;
+            font-weight: 700;
+            text-align: center;
+            color: white;
+            background: linear-gradient(140deg, var(--primary-color), var(--secondary-color));
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 10px 20px rgba(0, 113, 227, 0.4),
+                        0 6px 6px rgba(0, 113, 227, 0.2),
+                        0 -2px 6px rgba(255, 255, 255, 0.1) inset;
+            cursor: pointer;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        
+        .neo-button:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 15px 30px rgba(0, 113, 227, 0.5),
+                        0 8px 10px rgba(0, 113, 227, 0.2),
+                        0 -2px 6px rgba(255, 255, 255, 0.2) inset;
+        }
+        
+        .neo-button:active {
+            transform: translateY(2px) scale(0.98);
+            box-shadow: 0 5px 10px rgba(0, 113, 227, 0.3),
+                        0 3px 3px rgba(0, 113, 227, 0.1),
+                        0 -1px 3px rgba(255, 255, 255, 0.1) inset;
+        }
+        
+        .neo-button-text {
+            position: relative;
+            z-index: 10;
+            display: block;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+        
+        .neo-button-glare {
+            position: absolute;
+            top: -30px;
+            left: -30px;
+            width: 60px;
+            height: 60px;
+            background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%);
+            border-radius: 50%;
+            opacity: 0.6;
+            z-index: 1;
+            transform: scale(0);
+            transition: transform 0.5s ease;
+        }
+        
+        .neo-button:hover .neo-button-glare {
+            transform: scale(3) translateX(40px) translateY(20px);
+            opacity: 0.3;
+        }
+
+        .btn-primary:active {
+            transform: translateY(0) scale(0.98);
+            box-shadow: 0 2px 6px rgba(0, 122, 255, 0.2);
+        }
+
+        .btn-primary::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 5px;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.5);
+            opacity: 0;
+            border-radius: 100%;
+            transform: scale(1, 1) translate(-50%);
+            transform-origin: 50% 50%;
+        }
+
+        .btn-primary:focus:not(:active)::after {
+            animation: ripple 1s ease-out;
+        }
+
+        @keyframes ripple {
+            0% {
+                transform: scale(0, 0);
+                opacity: 0.5;
+            }
+            100% {
+                transform: scale(20, 20);
+                opacity: 0;
+            }
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: rgba(0, 122, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary:active {
+            transform: translateY(0);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 6px;
+            background-color: rgba(128, 128, 128, 0.2);
+            outline: none;
+            margin: 1rem 0;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 0 6px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+        }
+
+        input[type="text"] {
+            padding: 0.75rem;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            outline: none;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            font-size: 1.25rem;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .light input[type="text"] {
+            background-color: rgba(255, 255, 255, 0.9);
+            color: var(--text-light);
+        }
+
+        .dark input[type="text"] {
+            background-color: rgba(30, 30, 30, 0.9);
+            color: var(--text-dark);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .tabs {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            position: relative;
+            z-index: 5;
+        }
+
+        .tab-indicator {
+            width: 35px;
+            height: 5px;
+            border-radius: 3px;
+            margin: 0 5px;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .light .tab-indicator {
+            background-color: rgba(0, 0, 0, 0.15);
+        }
+
+        .dark .tab-indicator {
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .tab-indicator.active {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            width: 45px;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+        }
+
+        .pages {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .page {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.6s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .page-home {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .page-records {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+
+        .page-stats {
+            transform: translateX(200%);
+            opacity: 0;
+        }
+
+        .show-records .page-home {
+            transform: translateX(-100%);
+            opacity: 0;
+        }
+
+        .show-records .page-records {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .show-records .page-stats {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+
+        .show-stats .page-home {
+            transform: translateX(-200%);
+            opacity: 0;
+        }
+
+        .show-stats .page-records {
+            transform: translateX(-100%);
+            opacity: 0;
+        }
+
+        .show-stats .page-stats {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .toggle-mode {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+            color: inherit;
+            z-index: 10;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .light .toggle-mode {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        .dark .toggle-mode {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .toggle-mode:hover {
+            transform: rotate(30deg) scale(1.1);
+        }
+
+        .result-container {
+            text-align: center;
+            margin-top: 1.5rem;
+            min-height: 90px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .app-title {
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1.5rem;
+            letter-spacing: -1px;
+            position: relative;
+            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            animation: title-glow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes title-glow {
+            0% {
+                text-shadow: 0 0 5px rgba(0, 113, 227, 0.3);
+            }
+            100% {
+                text-shadow: 0 0 20px rgba(0, 113, 227, 0.6);
+            }
+        }
+
+        .number-display {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .number-display::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+        }
+
+        .light .number-display::before {
+            background-color: rgba(245, 245, 247, 0.95);
+        }
+
+        .dark .number-display::before {
+            background-color: rgba(0, 0, 0, 0.95);
+        }
+
+        .number-display.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .number {
+            font-size: 28vh;
+            font-weight: 900;
+            transform: scale(0);
+            opacity: 0;
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.6s ease;
+            z-index: 1;
+            text-shadow: 0 2px 20px rgba(0, 0, 0, 0.15);
+            position: relative;
+        }
+
+        .number.show {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .number.positive {
+            color: var(--success-color);
+        }
+
+        .number.negative {
+            color: var(--error-color);
+        }
+
+        .confetti-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 200;
+            overflow: hidden;
+        }
+
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 30px;
+            animation: confetti-fall linear forwards;
+            transform-origin: center;
+        }
+
+        @keyframes confetti-fall {
+            0% {
+                opacity: 1;
+                transform: translateY(-10px) rotate(0deg);
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(100vh) rotate(720deg);
+            }
+        }
+
+        .records-list {
+            overflow-y: auto;
+            flex: 1;
+            padding: 0.5rem;
+            margin-top: 1rem;
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary-color) transparent;
+        }
+
+        .records-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .records-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .records-list::-webkit-scrollbar-thumb {
+            background-color: var(--primary-color);
+            border-radius: 6px;
+        }
+
+        .record-item {
+            padding: 1rem;
+            border-radius: 12px;
+            margin-bottom: 0.75rem;
+            transition: all 0.3s ease;
+            animation: slide-in 0.5s cubic-bezier(0.23, 1, 0.32, 1) both;
+            animation-delay: calc(var(--i) * 0.05s);
+        }
+
+        @keyframes slide-in {
+            0% {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .light .record-item {
+            background-color: rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .dark .record-item {
+            background-color: rgba(40, 40, 40, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .record-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .record-date {
+            font-size: 0.85rem;
+            opacity: 0.7;
+            margin-bottom: 0.5rem;
+        }
+
+        .record-details {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .record-result {
+            font-weight: 600;
+        }
+
+        .no-records {
+            text-align: center;
+            padding: 3rem 2rem;
+            opacity: 0.7;
+            font-style: italic;
+        }
+
+        .combo-display {
+            position: absolute;
+            bottom: 1rem;
+            right: 1rem;
+            background: linear-gradient(135deg, var(--warning-color), var(--accent-color));
+            color: white;
+            border-radius: 12px;
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+            transform: scale(0);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            z-index: 20;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .combo-display.show {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            justify-content: center;
+        }
+
+        .mode-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: rgba(128, 128, 128, 0.1);
+            border: 1px solid rgba(128, 128, 128, 0.1);
+        }
+
+        .mode-btn.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .stats-card {
+            padding: 1rem;
+            border-radius: 15px;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+            animation: fade-in 0.5s ease both;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .light .stats-card {
+            background-color: rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .dark .stats-card {
+            background-color: rgba(40, 40, 40, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .stats-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .stats-title i {
+            margin-right: 0.5rem;
+            color: var(--primary-color);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .stats-item {
+            text-align: center;
+            padding: 0.75rem;
+            border-radius: 10px;
+            background-color: rgba(128, 128, 128, 0.05);
+        }
+
+        .stats-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stats-label {
+            font-size: 0.85rem;
+            opacity: 0.7;
+        }
+
+        .progress-container {
+            width: 100%;
+            height: 6px;
+            background-color: rgba(128, 128, 128, 0.1);
+            border-radius: 3px;
+            margin: 1rem 0;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+            border-radius: 3px;
+            width: 0;
+            transition: width 0.5s ease;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .pulse {
+            animation: pulse 0.5s ease;
+        }
+
+        @keyframes countdown-entry {
+            0% {
+                transform: translate(-50%, -50%) scale(0.3);
+                opacity: 0;
+                filter: blur(10px);
+            }
+            70% {
+                transform: translate(-50%, -50%) scale(1.1);
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+                filter: blur(0);
+            }
+        }
+        
+        @keyframes countdown-exit {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+                filter: blur(0);
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(2);
+                opacity: 0;
+                filter: blur(10px);
+            }
+        }
+        
+        .countdown-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 150;
+            pointer-events: none;
+        }
+        
+        .countdown-number {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            font-size: 18vmin;
+            font-weight: 900;
+            opacity: 0;
+            z-index: 151;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30vmin;
+            height: 30vmin;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.1);
+            box-shadow: 0 0 50px rgba(0, 113, 227, 0.3);
+            transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        
+        .light .countdown-number {
+            color: var(--primary-color);
+            background: rgba(255, 255, 255, 0.8);
+            text-shadow: 0 2px 10px rgba(0, 113, 227, 0.5);
+        }
+        
+        .dark .countdown-number {
+            color: white;
+            background: rgba(0, 113, 227, 0.15);
+            text-shadow: 0 2px 15px rgba(0, 113, 227, 0.8);
+        }
+        
+        .countdown-number.show {
+            animation: countdown-entry 0.5s forwards;
+        }
+        
+        .countdown-number.hide {
+            animation: countdown-exit 0.5s forwards;
+        }
+        
+        .countdown-start {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            font-size: 5.5vmin;
+            font-weight: 900;
+            opacity: 0;
+            z-index: 151;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: linear-gradient(135deg, var(--success-color), var(--warning-color));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            width: auto;
+            height: auto;
+            white-space: nowrap;
+            padding: 30px;
+            text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+        }
+        
+        .countdown-start.show {
+            animation: countdown-entry 0.5s forwards, glow-pulse 1.5s ease-in-out infinite alternate;
+        }
+        
+        .countdown-start.hide {
+            animation: countdown-exit 0.5s forwards;
+        }
+        
+        @keyframes glow-pulse {
+            0% {
+                text-shadow: 0 0 5px rgba(255, 204, 0, 0.5);
+            }
+            100% {
+                text-shadow: 0 0 30px rgba(255, 204, 0, 0.8);
+            }
+        }
+        
+        .countdown-circle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 35vmin;
+            height: 35vmin;
+            border-radius: 50%;
+            border: 5px solid var(--primary-color);
+            border-top-color: transparent;
+            opacity: 0.7;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% {
+                transform: translate(-50%, -50%) rotate(0deg);
+            }
+            100% {
+                transform: translate(-50%, -50%) rotate(360deg);
+            }
+        }
+
+        .operation {
+            position: absolute;
+            top: 10%;
+            right: 10%;
+            font-size: 3rem;
+            font-weight: 700;
+            opacity: 0.6;
+            transform: rotate(15deg);
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            pointer-events: none;
+            max-width: 200px;
+            text-align: center;
+        }
+
+        .tooltip::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 6px solid rgba(0, 0, 0, 0.8);
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .tooltip.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .settings-icon {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            cursor: pointer;
+            font-size: 1.2rem;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+
+        .light .settings-icon {
+            background-color: rgba(0, 0, 0, 0.05);
+            color: var(--text-light);
+        }
+
+        .dark .settings-icon {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: var(--text-dark);
+        }
+
+        .settings-icon:hover {
+            transform: rotate(30deg);
+        }
+
+        .settings-panel {
+            position: fixed;
+            top: 0;
+            left: -300px;
+            width: 300px;
+            height: 100%;
+            background-color: var(--card-light);
+            z-index: 1000;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            box-shadow: 5px 0 30px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 2rem 1.5rem;
+            overflow-y: auto;
+        }
+
+        .dark .settings-panel {
+            background-color: var(--card-dark);
+        }
+
+        .settings-panel.show {
+            left: 0;
+        }
+
+        .settings-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            cursor: pointer;
+            font-size: 1.2rem;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .settings-close:hover {
+            transform: rotate(90deg);
+        }
+
+        .settings-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+        }
+
+        .settings-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .settings-section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(128, 128, 128, 0.3);
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+
+        input:focus + .slider {
+            box-shadow: 0 0 1px var(--primary-color);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+        }
+
+        .overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        @media (max-width: 768px) {
+            .app-title {
+                font-size: 1.75rem;
+                margin-bottom: 1rem;
+            }
+
+            .number {
+                font-size: 20vh;
+            }
+
+            .app-container {
+                padding: 0.75rem;
+            }
+        }
+
+        .wrong-answer-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 15px 5px;
+            padding: 12px 5px;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.03);
+            max-width: 100%;
+            flex-wrap: wrap;
+        }
+        
+        .dark .wrong-answer-container {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .wrong-answer-box, .correct-answer-box {
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 90px;
+            flex: 1;
+        }
+        
+        .wrong-answer-box {
+            background: rgba(255, 59, 48, 0.1);
+            border: 1px solid rgba(255, 59, 48, 0.2);
+        }
+        
+        .correct-answer-box {
+            background: rgba(52, 199, 89, 0.1);
+            border: 1px solid rgba(52, 199, 89, 0.2);
+        }
+        
+        .wrong-answer-title, .correct-answer-title {
+            font-size: 0.8rem;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+        
+        .wrong-answer-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--error-color);
+            word-break: break-all;
+        }
+        
+        .correct-answer-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--success-color);
+            word-break: break-all;
+        }
+        
+        .wrong-answer-arrow {
+            color: var(--error-color);
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 24px;
+        }
+        
+        .simple-answer-box {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            padding: 12px 15px;
+            background: rgba(52, 199, 89, 0.1);
+            border: 1px solid rgba(52, 199, 89, 0.3);
+            border-radius: 10px;
+            max-width: 200px;
+        }
+        
+        .dark .simple-answer-box {
+            background: rgba(52, 199, 89, 0.15);
+        }
+        
+        .simple-answer-label {
+            font-size: 1rem;
+            margin-right: 10px;
+        }
+        
+        .simple-answer-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--success-color);
+        }
+        
+        .pulse-highlight {
+            animation: pulse-answer 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        
+        @media (max-width: 480px) {
+            .app-title {
+                font-size: 1.5rem;
+            }
+
+            .number {
+                font-size: 15vh;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .countdown-number {
+                font-size: 16vmin;
+                width: 25vmin;
+                height: 25vmin;
+            }
+            
+            .countdown-circle {
+                width: 30vmin;
+                height: 30vmin;
+            }
+            
+            .countdown-start {
+                font-size: 6vmin;
+            }
+        }
+    </style>
+</head>
+<body class="light">
+    <div class="app-container">
+        <div class="settings-icon" id="settingsIcon">
+            <i class="fas fa-cog"></i>
+        </div>
+
+        <button class="toggle-mode" id="toggleMode">
+            <i class="fas fa-moon"></i>
+        </button>
+
+        <h1 class="app-title">フラッシュ暗算 <span style="font-weight:900;text-transform:uppercase;font-size:0.8em;">Pro</span></h1>
+
+        <div class="tabs">
+            <div class="tab-indicator active" data-tab="home"></div>
+            <div class="tab-indicator" data-tab="records"></div>
+            <div class="tab-indicator" data-tab="stats"></div>
+        </div>
+
+        <div class="pages">
+            <div class="page page-home">
+                <div class="glass-card p-4 mb-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <span>桁数: <span id="digitValue">2</span>桁</span>
+                    </div>
+                    <input type="range" id="digitSlider" min="1" max="4" value="2" class="w-full">
+
+                    <div class="flex justify-between items-center mb-2">
+                        <span>速度: <span id="speedValue">0.5</span>秒</span>
+                    </div>
+                    <input type="range" id="speedSlider" min="0.1" max="1" value="0.5" step="0.1" class="w-full">
+
+                    <div class="flex justify-between items-center mb-2">
+                        <span>問題数: <span id="countValue">10</span>問</span>
+                    </div>
+                    <input type="range" id="countSlider" min="5" max="30" value="10" class="w-full">
+
+                    <div class="mode-selector">
+                        <div class="mode-btn active" data-mode="add">加算</div>
+                        <div class="mode-btn" data-mode="subtract">減算</div>
+                        <div class="mode-btn" data-mode="mixed">混合</div>
+                    </div>
+                </div>
+
+                <div class="glass-card p-4 flex-1 flex flex-col">
+                    <div class="progress-container">
+                        <div class="progress-bar" id="progressBar"></div>
+                    </div>
+
+                    <button class="neo-button" id="startButton">
+                        <span class="neo-button-text">スタート</span>
+                        <span class="neo-button-glare"></span>
+                    </button>
+
+                    <div class="flex items-center mb-4">
+                        <input type="text" id="answerInput" placeholder="答えを入力" class="flex-1 mr-2" inputmode="numeric" pattern="[0-9-]*">
+                        <div class="btn btn-secondary" id="submitButton">確認</div>
+                    </div>
+
+                    <div class="result-container" id="resultContainer"></div>
+
+                    <div class="combo-display" id="comboDisplay">コンボ × 1</div>
+                </div>
+            </div>
+
+            <div class="page page-records">
+                <div class="glass-card p-4 flex-1 flex flex-col">
+                    <h2 class="text-xl font-semibold mb-4">履歴</h2>
+                    <div class="records-list" id="recordsList">
+                        <div class="no-records" id="noRecords">履歴はまだありません</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page page-stats">
+                <div class="glass-card p-4 flex-1 flex flex-col">
+                    <h2 class="text-xl font-semibold mb-4">統計情報</h2>
+                    
+                    <div class="stats-card">
+                        <div class="stats-title"><i class="fas fa-chart-line"></i> 基本統計</div>
+                        <div class="stats-grid">
+                            <div class="stats-item">
+                                <div class="stats-value" id="totalGames">0</div>
+                                <div class="stats-label">総プレイ回数</div>
+                            </div>
+                            <div class="stats-item">
+                                <div class="stats-value" id="correctRate">0%</div>
+                                <div class="stats-label">正解率</div>
+                            </div>
+                            <div class="stats-item">
+                                <div class="stats-value" id="averageTime">0.0</div>
+                                <div class="stats-label">平均解答時間(秒)</div>
+                            </div>
+                            <div class="stats-item">
+                                <div class="stats-value" id="maxCombo">0</div>
+                                <div class="stats-label">最大コンボ数</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stats-card">
+                        <div class="stats-title"><i class="fas fa-medal"></i> 高難易度達成</div>
+                        <div class="stats-grid">
+                            <div class="stats-item">
+                                <div class="stats-value" id="digit3Correct">0</div>
+                                <div class="stats-label">3桁の正解数</div>
+                            </div>
+                            <div class="stats-item">
+                                <div class="stats-value" id="digit4Correct">0</div>
+                                <div class="stats-label">4桁の正解数</div>
+                            </div>
+                            <div class="stats-item">
+                                <div class="stats-value" id="fastestTime">--</div>
+                                <div class="stats-label">最速解答時間(秒)</div>
+                            </div>
+                            <div class="stats-item">
+                                <div class="stats-value" id="mixedModeCorrect">0</div>
+                                <div class="stats-label">混合モード正解数</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="number-display" id="numberDisplay">
+        <div class="number" id="numberElement"></div>
+        <div class="operation" id="operationElement"></div>
+    </div>
+
+    <div class="confetti-container" id="confettiContainer"></div>
+    
+    <div class="countdown-container" id="countdownContainer">
+        <div class="countdown-number" id="countdownNumber"></div>
+        <div class="countdown-start" id="countdownStart"></div>
+        <div class="countdown-circle" id="countdownCircle" style="display: none;"></div>
+    </div>
+
+    <div class="settings-panel" id="settingsPanel">
+        <div class="settings-close" id="settingsClose">
+            <i class="fas fa-times"></i>
+        </div>
+        <div class="settings-title">設定</div>
+
+        <div class="settings-section">
+            <div class="settings-section-title">サウンド</div>
+            <div class="flex justify-between items-center mb-3">
+                <span>効果音</span>
+                <label class="switch">
+                    <input type="checkbox" id="soundToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="flex justify-between items-center mb-2">
+                <span>音量</span>
+                <span id="volumeValue">80%</span>
+            </div>
+            <input type="range" id="volumeSlider" min="0" max="100" value="80" class="w-full">
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-section-title">表示</div>
+            <div class="flex justify-between items-center mb-3">
+                <span>カウントダウン表示</span>
+                <label class="switch">
+                    <input type="checkbox" id="countdownToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="flex justify-between items-center mb-3">
+                <span>エフェクト</span>
+                <label class="switch">
+                    <input type="checkbox" id="effectsToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-section-title">データ</div>
+            <div class="btn btn-secondary w-full mb-2" id="resetRecordsBtn">履歴をリセット</div>
+            <div class="btn btn-secondary w-full" id="resetStatsBtn">統計をリセット</div>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        // オーディオ要素の作成
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const soundEffects = {
+            start: null,
+            correct: null,
+            incorrect: null,
+            countdown: null,
+            click: null
+        };
+
+        // サウンド生成関数
+        function createBeepSound(frequency, duration, type = 'sine', volume = 0.5) {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.type = type;
+            oscillator.frequency.value = frequency;
+            
+            gainNode.gain.value = volume;
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + duration);
+            
+            return { oscillator, gainNode };
+        }
+
+        // 効果音の初期化
+        function initSounds() {
+            const playSoundEffect = (name) => {
+                if (!document.getElementById('soundToggle').checked) return;
+                
+                const volume = parseInt(document.getElementById('volumeSlider').value) / 100;
+                
+                switch(name) {
+                    case 'start':
+                        createBeepSound(880, 0.1, 'sine', volume * 0.6);
+                        setTimeout(() => createBeepSound(1320, 0.2, 'sine', volume * 0.7), 150);
+                        break;
+                    case 'correct':
+                        createBeepSound(1320, 0.06, 'sine', volume * 0.6);
+                        setTimeout(() => createBeepSound(1980, 0.15, 'triangle', volume * 0.7), 70);
+                        break;
+                    case 'incorrect':
+                        createBeepSound(220, 0.1, 'sawtooth', volume * 0.5);
+                        setTimeout(() => createBeepSound(180, 0.2, 'sawtooth', volume * 0.5), 120);
+                        break;
+                    case 'countdown':
+                        createBeepSound(660, 0.07, 'sine', volume * 0.4);
+                        break;
+                    case 'click':
+                        createBeepSound(550, 0.05, 'sine', volume * 0.2);
+                        break;
+                }
+            };
+            
+            soundEffects.start = () => playSoundEffect('start');
+            soundEffects.correct = () => playSoundEffect('correct');
+            soundEffects.incorrect = () => playSoundEffect('incorrect');
+            soundEffects.countdown = () => playSoundEffect('countdown');
+            soundEffects.click = () => playSoundEffect('click');
+        }
+
+        // ダークモード切り替え
+        const body = document.body;
+        const toggleModeBtn = document.getElementById('toggleMode');
+        const toggleIcon = toggleModeBtn.querySelector('i');
+
+        toggleModeBtn.addEventListener('click', () => {
+            body.classList.toggle('dark');
+            body.classList.toggle('light');
+            
+            if (body.classList.contains('dark')) {
+                toggleIcon.classList.remove('fa-moon');
+                toggleIcon.classList.add('fa-sun');
+            } else {
+                toggleIcon.classList.remove('fa-sun');
+                toggleIcon.classList.add('fa-moon');
+            }
+            
+            soundEffects.click();
+        });
+
+        // タブ切り替え
+        const tabIndicators = document.querySelectorAll('.tab-indicator');
+        const pagesContainer = document.querySelector('.pages');
+
+        tabIndicators.forEach(tab => {
+            tab.addEventListener('click', () => {
+                soundEffects.click();
+                
+                tabIndicators.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                if (tab.dataset.tab === 'home') {
+                    pagesContainer.classList.remove('show-records');
+                    pagesContainer.classList.remove('show-stats');
+                } else if (tab.dataset.tab === 'records') {
+                    pagesContainer.classList.add('show-records');
+                    pagesContainer.classList.remove('show-stats');
+                    loadRecords();
+                } else if (tab.dataset.tab === 'stats') {
+                    pagesContainer.classList.remove('show-records');
+                    pagesContainer.classList.add('show-stats');
+                    updateStats();
+                }
+            });
+        });
+
+        // スライダーの値表示
+        const digitSlider = document.getElementById('digitSlider');
+        const digitValue = document.getElementById('digitValue');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValue = document.getElementById('speedValue');
+        const countSlider = document.getElementById('countSlider');
+        const countValue = document.getElementById('countValue');
+        const volumeSlider = document.getElementById('volumeSlider');
+        const volumeValue = document.getElementById('volumeValue');
+
+        digitSlider.addEventListener('input', () => {
+            digitValue.textContent = digitSlider.value;
+        });
+
+        speedSlider.addEventListener('input', () => {
+            speedValue.textContent = speedSlider.value;
+        });
+
+        countSlider.addEventListener('input', () => {
+            countValue.textContent = countSlider.value;
+        });
+
+        volumeSlider.addEventListener('input', () => {
+            volumeValue.textContent = volumeSlider.value + '%';
+        });
+
+        // モード選択
+        const modeBtns = document.querySelectorAll('.mode-btn');
+        let currentMode = 'add';
+
+        modeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                soundEffects.click();
+                modeBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentMode = btn.dataset.mode;
+            });
+        });
+
+        // フラッシュ暗算機能
+        const startButton = document.getElementById('startButton');
+        const submitButton = document.getElementById('submitButton');
+        const answerInput = document.getElementById('answerInput');
+        const resultContainer = document.getElementById('resultContainer');
+        const numberDisplay = document.getElementById('numberDisplay');
+        const numberElement = document.getElementById('numberElement');
+        const operationElement = document.getElementById('operationElement');
+        const comboDisplay = document.getElementById('comboDisplay');
+        const progressBar = document.getElementById('progressBar');
+        const countdown = document.getElementById('countdown');
+        const confettiContainer = document.getElementById('confettiContainer');
+
+        let numbers = [];
+        let operations = [];
+        let currentIndex = 0;
+        let correctAnswer = 0;
+        let startTime = 0;
+        let isRunning = false;
+        let comboCount = 0;
+        let maxCombo = 0;
+
+        startButton.addEventListener('click', () => {
+            if (isRunning) return;
+            startGame();
+        });
+        
+        submitButton.addEventListener('click', checkAnswer);
+        
+        answerInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+
+        function startGame() {
+            if (isRunning) return;
+            
+            isRunning = true;
+            numbers = [];
+            operations = [];
+            currentIndex = 0;
+            correctAnswer = 0;
+            answerInput.value = '';
+            resultContainer.innerHTML = '';
+            progressBar.style.width = '0%';
+            
+            const digits = parseInt(digitSlider.value);
+            const count = parseInt(countSlider.value);
+            
+            // カウントダウン表示
+            if (document.getElementById('countdownToggle').checked) {
+                startCountdown(() => {
+                    // 数字生成
+                    generateNumbers(digits, count);
+                    
+                    // 数字表示開始
+                    setTimeout(() => {
+                        showNextNumber();
+                    }, 300);
+                });
+            } else {
+                // 数字生成
+                generateNumbers(digits, count);
+                
+                // 数字表示開始
+                soundEffects.start();
+                showNextNumber();
+            }
+        }
+
+        function generateNumbers(digits, count) {
+            const min = Math.pow(10, digits - 1);
+            const max = Math.pow(10, digits) - 1;
+            
+            // 最初の数字
+            const firstNum = Math.floor(Math.random() * (max - min + 1)) + min;
+            numbers.push(firstNum);
+            correctAnswer = firstNum;
+            operations.push('+'); // 最初の操作は表示しないがプレースホルダとして追加
+            
+            // 残りの数字
+            for (let i = 1; i < count; i++) {
+                const num = Math.floor(Math.random() * (max - min + 1)) + min;
+                let operation;
+                
+                if (currentMode === 'add') {
+                    operation = '+';
+                } else if (currentMode === 'subtract') {
+                    operation = '-';
+                } else { // mixed
+                    operation = Math.random() < 0.5 ? '+' : '-';
+                }
+                
+                operations.push(operation);
+                numbers.push(num);
+                
+                if (operation === '+') {
+                    correctAnswer += num;
+                } else {
+                    correctAnswer -= num;
+                }
+            }
+        }
+
+        function startCountdown(callback) {
+            const countdownNumber = document.getElementById('countdownNumber');
+            const countdownStart = document.getElementById('countdownStart');
+            const countdownCircle = document.getElementById('countdownCircle');
+            
+            // 最初に円を表示
+            countdownCircle.style.display = 'block';
+            
+            // 3のカウントダウン
+            countdownNumber.textContent = '3';
+            countdownNumber.classList.add('show');
+            soundEffects.countdown();
+            
+            setTimeout(() => {
+                // 3を非表示にして2を表示
+                countdownNumber.classList.remove('show');
+                countdownNumber.classList.add('hide');
+                
+                setTimeout(() => {
+                    countdownNumber.classList.remove('hide');
+                    countdownNumber.textContent = '2';
+                    countdownNumber.classList.add('show');
+                    soundEffects.countdown();
+                    
+                    setTimeout(() => {
+                        // 2を非表示にして1を表示
+                        countdownNumber.classList.remove('show');
+                        countdownNumber.classList.add('hide');
+                        
+                        setTimeout(() => {
+                            countdownNumber.classList.remove('hide');
+                            countdownNumber.textContent = '1';
+                            countdownNumber.classList.add('show');
+                            soundEffects.countdown();
+                            
+                            setTimeout(() => {
+                                // 1を非表示にしてスタートを表示
+                                countdownNumber.classList.remove('show');
+                                countdownNumber.classList.add('hide');
+                                countdownCircle.style.display = 'none';
+                                
+                                setTimeout(() => {
+                                    countdownNumber.classList.remove('hide');
+                                    countdownStart.textContent = 'スタート！';
+                                    countdownStart.classList.add('show');
+                                    soundEffects.start();
+                                    
+                                    // スタートボタン効果
+                                    if (document.getElementById('effectsToggle').checked) {
+                                        const centerX = window.innerWidth / 2;
+                                        const centerY = window.innerHeight / 2;
+                                        createRippleEffect(centerX, centerY);
+                                    }
+                                    
+                                    setTimeout(() => {
+                                        countdownStart.classList.remove('show');
+                                        countdownStart.classList.add('hide');
+                                        
+                                        setTimeout(() => {
+                                            countdownStart.classList.remove('hide');
+                                            if (callback) callback();
+                                        }, 300);
+                                    }, 800);
+                                }, 200);
+                            }, 700);
+                        }, 200);
+                    }, 700);
+                }, 200);
+            }, 700);
+        }
+        
+        function createRippleEffect(x, y) {
+            const ripple = document.createElement('div');
+            ripple.style.position = 'fixed';
+            ripple.style.top = '0';
+            ripple.style.left = '0';
+            ripple.style.right = '0';
+            ripple.style.bottom = '0';
+            ripple.style.pointerEvents = 'none';
+            ripple.style.zIndex = '100';
+            
+            const circle = document.createElement('div');
+            circle.style.position = 'absolute';
+            circle.style.top = y + 'px';
+            circle.style.left = x + 'px';
+            circle.style.width = '10px';
+            circle.style.height = '10px';
+            circle.style.borderRadius = '50%';
+            circle.style.background = 'rgba(255, 255, 255, 0.5)';
+            circle.style.transform = 'translate(-50%, -50%)';
+            circle.style.animation = 'ripple-out 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+            
+            ripple.appendChild(circle);
+            document.body.appendChild(ripple);
+            
+            setTimeout(() => {
+                document.body.removeChild(ripple);
+            }, 1000);
+        }
+
+        function showNextNumber() {
+            if (currentIndex >= numbers.length) {
+                // 全ての数字表示が終了
+                numberDisplay.classList.remove('show');
+                startTime = Date.now();
+                isRunning = false;
+                answerInput.focus();
+                return;
+            }
+            
+            const progress = (currentIndex / numbers.length) * 100;
+            progressBar.style.width = `${progress}%`;
+            
+            const speed = parseFloat(speedSlider.value) * 1000;
+            
+            numberDisplay.classList.add('show');
+            numberElement.textContent = numbers[currentIndex];
+            
+            // 数字の色分け (加算/減算)
+            if (operations[currentIndex] === '+') {
+                numberElement.classList.add('positive');
+                numberElement.classList.remove('negative');
+                operationElement.textContent = '+';
+            } else {
+                numberElement.classList.add('negative');
+                numberElement.classList.remove('positive');
+                operationElement.textContent = '-';
+            }
+            
+            numberElement.classList.add('show');
+            
+            setTimeout(() => {
+                numberElement.classList.remove('show');
+                
+                setTimeout(() => {
+                    currentIndex++;
+                    showNextNumber();
+                }, 300);
+            }, speed);
+        }
+
+        function checkAnswer() {
+            if (!answerInput.value || isRunning) return;
+            
+            const userAnswer = parseInt(answerInput.value);
+            const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
+            
+            if (userAnswer === correctAnswer) {
+                // コンボ増加
+                comboCount++;
+                if (comboCount > maxCombo) {
+                    maxCombo = comboCount;
+                }
+                
+                if (document.getElementById('effectsToggle').checked) {
+                    showConfetti();
+                }
+                
+                soundEffects.correct();
+                
+                resultContainer.innerHTML = `
+                    <div class="text-green-500 font-bold text-2xl mb-2">正解！</div>
+                    <div>時間: ${elapsedTime}秒</div>
+                `;
+                
+                // コンボ表示
+                if (comboCount > 1) {
+                    comboDisplay.textContent = `コンボ × ${comboCount}`;
+                    comboDisplay.classList.add('show');
+                    setTimeout(() => {
+                        comboDisplay.classList.remove('show');
+                    }, 3000);
+                }
+                
+                // 記録を保存
+                saveRecord(true, elapsedTime);
+            } else {
+                soundEffects.incorrect();
+                
+                // コンボリセット
+                comboCount = 0;
+                
+                // 間違えた時の表示強化 - シンプルかつ分かりやすく修正
+                resultContainer.innerHTML = `
+                    <div class="text-red-500 font-bold text-2xl mb-3">不正解</div>
+                    <div class="simple-answer-box">
+                        <div class="simple-answer-label">正解:</div>
+                        <div class="simple-answer-value">${correctAnswer}</div>
+                    </div>
+                    <div class="mt-3">
+                        <div>あなたの回答: <span class="font-semibold">${userAnswer}</span></div>
+                        <div class="mt-1">解答時間: ${elapsedTime}秒</div>
+                    </div>
+                `;
+                
+                // 記録を保存
+                saveRecord(false, elapsedTime);
+                
+                // 正解の数値を強調するアニメーション
+                setTimeout(() => {
+                    const correctValueEl = document.querySelector('.simple-answer-value');
+                    if (correctValueEl) correctValueEl.classList.add('pulse-highlight');
+                }, 200);
+            }
+            
+            // 入力欄をクリア
+            setTimeout(() => {
+                answerInput.value = '';
+            }, 100);
+        }
+
+        function showConfetti() {
+            confettiContainer.innerHTML = '';
+            
+            const colors = ['#ff2d55', '#5ac8fa', '#007aff', '#ffcc00', '#34c759', '#af52de', '#ff9500'];
+            const shapes = ['circle', 'square', 'triangle'];
+            
+            for (let i = 0; i < 200; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                
+                // ランダムな位置、サイズ、色、形状
+                const left = Math.random() * 100;
+                const width = Math.random() * 12 + 8;
+                const height = Math.random() * 10 + 10;
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                const shape = shapes[Math.floor(Math.random() * shapes.length)];
+                const opacity = Math.random() * 0.3 + 0.7;
+                
+                // 落下速度とアニメーション
+                const animationDuration = Math.random() * 3 + 2;
+                
+                confetti.style.width = `${width}px`;
+                confetti.style.height = `${height}px`;
+                confetti.style.left = `${left}vw`;
+                confetti.style.top = `-${height}px`;
+                confetti.style.backgroundColor = color;
+                confetti.style.opacity = opacity;
+                confetti.style.animationDuration = `${animationDuration}s`;
+                
+                // 形状
+                if (shape === 'circle') {
+                    confetti.style.borderRadius = '50%';
+                } else if (shape === 'triangle') {
+                    confetti.style.width = '0';
+                    confetti.style.height = '0';
+                    confetti.style.backgroundColor = 'transparent';
+                    confetti.style.borderLeft = `${width/2}px solid transparent`;
+                    confetti.style.borderRight = `${width/2}px solid transparent`;
+                    confetti.style.borderBottom = `${height}px solid ${color}`;
+                }
+                
+                // 初期位置をランダムに（画面全体に散らばるように）
+                confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
+                
+                confettiContainer.appendChild(confetti);
+            }
+        }
+
+        // 履歴管理
+        function saveRecord(isCorrect, time) {
+            const records = getRecords();
+            records.unshift({
+                date: new Date().toLocaleString(),
+                digits: parseInt(digitSlider.value),
+                speed: parseFloat(speedSlider.value),
+                count: parseInt(countSlider.value),
+                mode: currentMode,
+                isCorrect: isCorrect,
+                time: parseFloat(time)
+            });
+            
+            // 最大50件まで保存
+            if (records.length > 50) {
+                records.pop();
+            }
+            
+            localStorage.setItem('flashMathRecords', JSON.stringify(records));
+            updateStats();
+        }
+
+        function getRecords() {
+            const recordsStr = localStorage.getItem('flashMathRecords');
+            return recordsStr ? JSON.parse(recordsStr) : [];
+        }
+
+        function loadRecords() {
+            const records = getRecords();
+            const recordsList = document.getElementById('recordsList');
+            const noRecords = document.getElementById('noRecords');
+            
+            if (records.length === 0) {
+                recordsList.innerHTML = '<div class="no-records">履歴はまだありません</div>';
+                return;
+            }
+            
+            noRecords.style.display = 'none';
+            
+            let html = '';
+            records.forEach((record, index) => {
+                const modeText = record.mode === 'add' ? '加算' : record.mode === 'subtract' ? '減算' : '混合';
+                
+                html += `
+                    <div class="record-item" style="--i: ${index}">
+                        <div class="record-date">${record.date}</div>
+                        <div class="record-details">
+                            <span>${record.digits}桁 × ${record.count}問 (${record.speed}秒)</span>
+                            <span class="record-result" style="color:${record.isCorrect ? 'var(--success-color)' : 'var(--error-color)'}">
+                                ${record.isCorrect ? '正解' : '不正解'}
+                            </span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>モード: ${modeText}</span>
+                            <span>解答時間: ${record.time}秒</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            recordsList.innerHTML = html;
+        }
+
+        // 統計情報の更新
+        function updateStats() {
+            const records = getRecords();
+            
+            if (records.length === 0) {
+                document.getElementById('totalGames').textContent = '0';
+                document.getElementById('correctRate').textContent = '0%';
+                document.getElementById('averageTime').textContent = '0.0';
+                document.getElementById('maxCombo').textContent = '0';
+                document.getElementById('digit3Correct').textContent = '0';
+                document.getElementById('digit4Correct').textContent = '0';
+                document.getElementById('fastestTime').textContent = '--';
+                document.getElementById('mixedModeCorrect').textContent = '0';
+                return;
+            }
+            
+            // 基本統計
+            const totalGames = records.length;
+            const correctGames = records.filter(r => r.isCorrect).length;
+            const correctRate = Math.round((correctGames / totalGames) * 100);
+            
+            // 平均回答時間（正解のみ）
+            const correctTimes = records.filter(r => r.isCorrect).map(r => r.time);
+            const averageTime = correctTimes.length > 0 
+                ? (correctTimes.reduce((sum, time) => sum + time, 0) / correctTimes.length).toFixed(2)
+                : '0.0';
+            
+            // 最速回答時間
+            const fastestTime = correctTimes.length > 0 
+                ? Math.min(...correctTimes).toFixed(2)
+                : '--';
+            
+            // 難易度ごとの統計
+            const digit3Correct = records.filter(r => r.isCorrect && r.digits >= 3).length;
+            const digit4Correct = records.filter(r => r.isCorrect && r.digits >= 4).length;
+            const mixedModeCorrect = records.filter(r => r.isCorrect && r.mode === 'mixed').length;
+            
+            // 統計を表示
+            document.getElementById('totalGames').textContent = totalGames;
+            document.getElementById('correctRate').textContent = correctRate + '%';
+            document.getElementById('averageTime').textContent = averageTime;
+            document.getElementById('maxCombo').textContent = maxCombo;
+            document.getElementById('digit3Correct').textContent = digit3Correct;
+            document.getElementById('digit4Correct').textContent = digit4Correct;
+            document.getElementById('fastestTime').textContent = fastestTime;
+            document.getElementById('mixedModeCorrect').textContent = mixedModeCorrect;
+            
+            // 統計アニメーション
+            document.querySelectorAll('.stats-value').forEach(el => {
+                el.classList.add('pulse');
+                setTimeout(() => {
+                    el.classList.remove('pulse');
+                }, 500);
+            });
+        }
+
+        // 設定パネル
+        const settingsIcon = document.getElementById('settingsIcon');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const settingsClose = document.getElementById('settingsClose');
+        const overlay = document.getElementById('overlay');
+        const resetRecordsBtn = document.getElementById('resetRecordsBtn');
+        const resetStatsBtn = document.getElementById('resetStatsBtn');
+
+        settingsIcon.addEventListener('click', () => {
+            soundEffects.click();
+            settingsPanel.classList.add('show');
+            overlay.classList.add('show');
+        });
+
+        settingsClose.addEventListener('click', () => {
+            soundEffects.click();
+            settingsPanel.classList.remove('show');
+            overlay.classList.remove('show');
+        });
+
+        overlay.addEventListener('click', () => {
+            settingsPanel.classList.remove('show');
+            overlay.classList.remove('show');
+        });
+
+        resetRecordsBtn.addEventListener('click', () => {
+            if (confirm('本当に履歴をリセットしますか？')) {
+                localStorage.removeItem('flashMathRecords');
+                loadRecords();
+                updateStats();
+                alert('履歴をリセットしました');
+            }
+        });
+
+        resetStatsBtn.addEventListener('click', () => {
+            if (confirm('本当に統計情報をリセットしますか？')) {
+                localStorage.removeItem('flashMathRecords');
+                maxCombo = 0;
+                comboCount = 0;
+                updateStats();
+                loadRecords();
+                alert('統計情報をリセットしました');
+            }
+        });
+
+        // ツールチップ表示
+        function showTooltip(el, text) {
+            const tooltip = document.getElementById('tooltip');
+            const rect = el.getBoundingClientRect();
+            
+            tooltip.textContent = text;
+            tooltip.style.top = (rect.top - tooltip.offsetHeight - 10) + 'px';
+            tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
+            tooltip.classList.add('show');
+            
+            setTimeout(() => {
+                tooltip.classList.remove('show');
+            }, 2000);
+        }
+
+        // 初期化
+        initSounds();
+        loadRecords();
+        updateStats();
+    </script>
+</body>
+</html>
